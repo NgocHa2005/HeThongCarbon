@@ -1,0 +1,43 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-ChangeMe_123!}
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - carbon_sql_data:/var/opt/mssql
+      - ./coSoDuLieu:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-mssql+pyodbc://sa:${MSSQL_SA_PASSWORD:-ChangeMe_123!}@sqlserver:1433/${MSSQL_DATABASE:-CarbonGreatBritain}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes}
+      CARBON_API_BASE_URL: ${CARBON_API_BASE_URL:-https://api.carbonintensity.org.uk}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      COLLECTION_INTERVAL_SECONDS: ${COLLECTION_INTERVAL_SECONDS:-1800}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - backend
+
+volumes:
+  carbon_sql_data:
