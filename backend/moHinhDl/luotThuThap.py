@@ -12,7 +12,7 @@ class LuotThuThap(Base):
         primary_key=True,
         autoincrement=True,
     )
-    nguoi_kich_hoat = Column("TriggeredBy", String, nullable=False)
+    nguoi_kich_hoat = Column("TriggeredBy", String(30), nullable=False)
     bat_dau_luc = Column("StartTime", DateTime(timezone=True), nullable=False, server_default=func.now())
     ket_thuc_luc = Column("EndTime", DateTime(timezone=True), nullable=True)
     so_ban_ghi_them = Column("RecordsInserted", Integer, nullable=False, server_default="0")

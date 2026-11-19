@@ -33,9 +33,13 @@ def _phan_tich_tham_so(argv: list[str] | None = None) -> argparse.Namespace:
     return arguments
 
 
+def _ma_kich_hoat(source: str, mode: str) -> str:
+    return f"github-{source}-{mode}"
+
+
 def main(argv: list[str] | None = None) -> int:
     arguments = _phan_tich_tham_so(argv)
-    triggered_by = f"github-actions-{arguments.source}-{arguments.mode}"
+    triggered_by = _ma_kich_hoat(arguments.source, arguments.mode)
     run_id = tao_luot_thu_thap(triggered_by)
     succeeded = thuc_hien_luot_thu_thap(
         run_id,

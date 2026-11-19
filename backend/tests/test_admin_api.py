@@ -14,7 +14,7 @@ from cauHinh.ketNoiDb import Base
 import cauHinh.ketNoiDb as database
 import dichVu.dichVuCanhBao as alerts
 import dichVu.dichVuCaoDuLieu as collector
-from dichVu.ingestion_cli import _phan_tich_tham_so
+from dichVu.ingestion_cli import _ma_kich_hoat, _phan_tich_tham_so
 import main
 from moHinhDl import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
 
@@ -97,7 +97,7 @@ class AdminApiTests(unittest.TestCase):
         started = datetime.now(timezone.utc) - timedelta(hours=2)
         db.add(
             LuotThuThap(
-                nguoi_kich_hoat="github-actions-schedule-collect",
+                nguoi_kich_hoat="github-schedule-collect",
                 trang_thai="SUCCESS",
                 bat_dau_luc=started,
                 ket_thuc_luc=started + timedelta(seconds=5),
@@ -181,6 +181,17 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual(regions[0]["cuong_do"], 90)
 
 class CarbonCollectorTests(unittest.TestCase):
+    def test_ingestion_trigger_names_fit_database_column_limit(self):
+        column_limit = LuotThuThap.__table__.c.TriggeredBy.type.length
+
+        for source in ("schedule", "dispatch"):
+            for mode in ("collect", "backfill"):
+                with self.subTest(source=source, mode=mode):
+                    self.assertLessEqual(
+                        len(_ma_kich_hoat(source, mode)),
+                        column_limit,
+                    )
+
     def test_backfill_cli_treats_end_date_as_inclusive(self):
         arguments = _phan_tich_tham_so(
             [
