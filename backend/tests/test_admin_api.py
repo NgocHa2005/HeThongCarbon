@@ -1,20 +1,22 @@
 import asyncio
 import unittest
 from datetime import datetime, timedelta, timezone
+from urllib.parse import unquote
 from unittest.mock import patch
 
 import httpx
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from cauHinh.ketNoiDb import Base
 import cauHinh.ketNoiDb as database
+import dichVu.dichVuCanhBao as alerts
 import dichVu.dichVuCaoDuLieu as collector
+from dichVu.ingestion_cli import _phan_tich_tham_so
 import main
-from dinhTuyen import tuyenQuanTri
-from moHinhDl import DuLieuKhuVuc, GenerationMix, SoLieuCarbon
+from moHinhDl import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
 
 
 def _tao_engine():
@@ -34,7 +36,6 @@ class AdminApiTests(unittest.TestCase):
             patch.object(database, "engine", self.engine),
             patch.object(database, "SessionLocal", self.sessions),
             patch.object(main, "engine", self.engine),
-            patch.object(main, "SessionLocal", self.sessions),
         ]
         for item in self.patches:
             item.start()
@@ -53,8 +54,66 @@ class AdminApiTests(unittest.TestCase):
 
         self.assertEqual(status.status_code, 200)
         self.assertEqual(status.json()["status"], "idle")
+        self.assertEqual(status.json()["monitoring"]["state"], "never_succeeded")
         self.assertEqual(history.status_code, 200)
         self.assertEqual(history.json(), {"items": []})
+
+    def test_quality_endpoint_reports_missing_core_and_alert_tables(self):
+        response = self.client.get("/api/v1/admin/quality")
+
+        self.assertEqual(response.status_code, 200)
+        quality = response.json()
+        self.assertEqual(quality["quality_state"], "warning")
+        self.assertIn("missing_national_data", [warning["code"] for warning in quality["warnings"]])
+        self.assertFalse(quality["alerts_table_available"])
+        self.assertEqual(quality["alert_rules"]["absolute_threshold_gco2_per_kwh"], 250)
+        self.assertEqual(quality["alert_rules"]["change_percent"], 30)
+        self.assertEqual(quality["alert_rules"]["window_hours"], 24)
+
+    def test_quality_endpoint_reads_existing_alert_table_without_assuming_its_model(self):
+        db = self.sessions()
+        db.execute(
+            text(
+                'CREATE TABLE "SYS_CARBON_ALERTS" '
+                '("AlertId" INTEGER PRIMARY KEY, "CreatedAt" TEXT, "Message" TEXT)'
+            )
+        )
+        db.execute(
+            text(
+                'INSERT INTO "SYS_CARBON_ALERTS" ("AlertId", "CreatedAt", "Message") '
+                "VALUES (1, '2026-11-19T12:00:00Z', 'High carbon intensity')"
+            )
+        )
+        db.commit()
+        db.close()
+
+        quality = self.client.get("/api/v1/admin/quality").json()
+
+        self.assertTrue(quality["alerts_table_available"])
+        self.assertEqual(quality["alerts"][0]["Message"], "High carbon intensity")
+
+    def test_monitoring_recognizes_success_and_stale_runs(self):
+        db = self.sessions()
+        started = datetime.now(timezone.utc) - timedelta(hours=2)
+        db.add(
+            LuotThuThap(
+                nguoi_kich_hoat="github-actions-schedule-collect",
+                trang_thai="SUCCESS",
+                bat_dau_luc=started,
+                ket_thuc_luc=started + timedelta(seconds=5),
+                so_ban_ghi_them=10,
+                so_ban_ghi_cap_nhat=7,
+            )
+        )
+        db.commit()
+        db.close()
+
+        status = self.client.get("/api/v1/admin/status").json()
+
+        self.assertEqual(status["status"], "SUCCESS")
+        self.assertEqual(status["monitoring"]["state"], "delayed")
+        self.assertEqual(status["records_inserted"], 10)
+        self.assertEqual(status["records_updated"], 7)
 
     def test_public_data_endpoints_handle_an_empty_database(self):
         self.assertEqual(self.client.get("/api/v1/carbon/latest").json(), {"data": None})
@@ -121,25 +180,120 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual([row["ma_vung"] for row in regions], [1])
         self.assertEqual(regions[0]["cuong_do"], 90)
 
-    def test_collect_creates_a_completed_job_and_history_entry(self):
-        async def fake_collect(db, update_stage=None):
-            if update_stage:
-                update_stage("database")
-            return collector.KetQuaThuThap(inserted=4, updated=0)
-
-        with patch.object(tuyenQuanTri, "thu_thap_du_lieu", fake_collect):
-            response = self.client.post("/api/v1/admin/collect")
-
-        self.assertEqual(response.status_code, 202)
-        self.assertEqual(response.json()["status"], "queued")
-        status = self.client.get("/api/v1/admin/status").json()
-        history = self.client.get("/api/v1/admin/history").json()["items"]
-        self.assertEqual(status["status"], "succeeded")
-        self.assertEqual(status["records_processed"], 4)
-        self.assertEqual(len(history), 1)
-
-
 class CarbonCollectorTests(unittest.TestCase):
+    def test_backfill_cli_treats_end_date_as_inclusive(self):
+        arguments = _phan_tich_tham_so(
+            [
+                "--mode",
+                "backfill",
+                "--start-date",
+                "2026-01-01",
+                "--end-date",
+                "2026-01-01",
+            ]
+        )
+
+        self.assertEqual(arguments.end_exclusive - arguments.start_date, timedelta(days=1))
+
+    def test_alert_is_created_once_for_a_30_percent_jump_from_the_prior_day(self):
+        engine = _tao_engine()
+        Base.metadata.create_all(bind=engine)
+        session = sessionmaker(bind=engine)()
+        session.execute(
+            text(
+                'CREATE TABLE "SYS_CARBON_ALERTS" ('
+                '"AlertId" INTEGER PRIMARY KEY AUTOINCREMENT, '
+                '"ReadingId" INTEGER NOT NULL, '
+                '"AlertTime" TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, '
+                '"ThresholdLimit" INTEGER NOT NULL, '
+                '"ExceededValue" INTEGER NOT NULL, '
+                '"Severity" VARCHAR(15) NOT NULL, '
+                '"CauseFuel" VARCHAR(50), '
+                '"IsDismissed" BOOLEAN NOT NULL DEFAULT 0)'
+            )
+        )
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        session.add(DuLieuKhuVuc(ma_vung=0, ten_vung="GB", ten_day_du="Great Britain"))
+        for index in range(48):
+            from_time = start + timedelta(minutes=30 * index)
+            session.add(
+                SoLieuCarbon(
+                    ma_vung=0,
+                    thoi_gian=from_time,
+                    den_thoi_gian=from_time + timedelta(minutes=30),
+                    cuong_do_du_bao=100,
+                    cuong_do_thuc_te=100,
+                    muc_do="low",
+                    gio=from_time.hour,
+                    thu_trong_tuan=from_time.weekday(),
+                    thang=from_time.month,
+                )
+            )
+        session.flush()
+        alert_time = start + timedelta(days=1)
+        current = SoLieuCarbon(
+            ma_vung=0,
+            thoi_gian=alert_time,
+            den_thoi_gian=alert_time + timedelta(minutes=30),
+            cuong_do_du_bao=140,
+            cuong_do_thuc_te=140,
+            muc_do="moderate",
+            gio=alert_time.hour,
+            thu_trong_tuan=alert_time.weekday(),
+            thang=alert_time.month,
+        )
+        session.add(current)
+        session.flush()
+        high_time = alert_time + timedelta(minutes=30)
+        high_reading = SoLieuCarbon(
+            ma_vung=0,
+            thoi_gian=high_time,
+            den_thoi_gian=high_time + timedelta(minutes=30),
+            cuong_do_du_bao=300,
+            cuong_do_thuc_te=300,
+            muc_do="high",
+            gio=high_time.hour,
+            thu_trong_tuan=high_time.weekday(),
+            thang=high_time.month,
+        )
+        session.add(high_reading)
+        session.flush()
+        self.assertNotEqual(current.id, high_reading.id)
+        current_id = current.id
+        high_reading_id = high_reading.id
+
+        try:
+            with patch.object(alerts, "CARBON_ALERT_THRESHOLD", 250), patch.object(
+                alerts, "CARBON_ALERT_CHANGE_PERCENT", 30
+            ), patch.object(alerts, "CARBON_ALERT_WINDOW_HOURS", 24):
+                alerts.kiem_tra_canh_bao_cuong_do(session, current)
+                alerts.kiem_tra_canh_bao_cuong_do(session, current)
+                self.assertEqual(
+                    session.execute(
+                        text('SELECT "AlertId", "ReadingId" FROM "SYS_CARBON_ALERTS"')
+                    ).all(),
+                    [(1, current_id)],
+                )
+                alerts.kiem_tra_canh_bao_cuong_do(session, high_reading)
+                alerts.kiem_tra_canh_bao_cuong_do(session, high_reading)
+            session.commit()
+            stored = session.execute(
+                text(
+                    'SELECT "ReadingId", "ThresholdLimit", "ExceededValue", "Severity" '
+                    'FROM "SYS_CARBON_ALERTS" ORDER BY "AlertId"'
+                )
+            ).all()
+            self.assertEqual(
+                stored,
+                [
+                    (current_id, 130, 140, "MEDIUM"),
+                    (high_reading_id, 250, 300, "HIGH"),
+                ],
+            )
+        finally:
+            session.close()
+            engine.dispose()
+
     def test_collection_writes_orm_compatible_rows_and_upserts_duplicates(self):
         responses = {
             "/intensity": {
@@ -168,11 +322,12 @@ class CarbonCollectorTests(unittest.TestCase):
                         "to": "2026-11-13T00:30Z",
                         "regions": [
                             {
-                                "regionid": 1,
-                                "shortname": "North",
-                                "name": "North Region",
+                                "regionid": region_id,
+                                "shortname": f"Region {region_id}",
+                                "name": f"Region {region_id}",
                                 "intensity": {"forecast": 90, "index": "low"},
                             }
+                            for region_id in range(1, 18)
                         ]
                     }
                 ]
@@ -212,15 +367,120 @@ class CarbonCollectorTests(unittest.TestCase):
                 regions = session.query(DuLieuKhuVuc).order_by(DuLieuKhuVuc.ma_vung).all()
                 generation_mix = session.query(GenerationMix).one()
 
-                self.assertEqual((first_result.inserted, first_result.updated), (2, 0))
-                self.assertEqual((second_result.inserted, second_result.updated), (0, 2))
+                self.assertEqual((first_result.inserted, first_result.updated), (18, 0))
+                self.assertEqual((second_result.inserted, second_result.updated), (0, 18))
                 self.assertEqual(len(national_rows), 1)
                 self.assertEqual(national_rows[0].cuong_do, 104)
                 self.assertEqual(national_rows[0].generation_mix.clean_total, 60)
                 self.assertEqual(len(regional_rows), 1)
                 self.assertEqual(regional_rows[0].cuong_do, 90)
-                self.assertEqual([(row.ma_vung, row.ten_vung) for row in regions], [(0, "GB"), (1, "North")])
+                self.assertEqual([row.ma_vung for row in regions], list(range(18)))
                 self.assertEqual(generation_mix.reading_id, national_rows[0].id)
+        finally:
+            session.close()
+            engine.dispose()
+
+    def test_historical_collection_uses_supported_routes_and_upserts_by_period(self):
+        requests = []
+
+        def responder(request):
+            path = unquote(request.url.path).strip("/").split("/")
+            requests.append(request.url.path)
+            if path[0] == "regional":
+                from_time, to_time = path[2], path[3]
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": [
+                            {
+                                "from": from_time,
+                                "to": to_time,
+                                "regions": [
+                                    *[
+                                        {
+                                            "regionid": region_id,
+                                            "shortname": f"Region {region_id}",
+                                            "name": f"Region {region_id}",
+                                            "intensity": {"forecast": 90, "index": "low"},
+                                        }
+                                        for region_id in range(1, 18)
+                                    ],
+                                    {
+                                        "regionid": 18,
+                                        "shortname": "GB",
+                                        "name": "Great Britain",
+                                        "intensity": {"forecast": 90, "index": "low"},
+                                    },
+                                ],
+                            }
+                        ]
+                    },
+                )
+
+            from_time, to_time = path[1], path[2]
+            if path[0] == "generation":
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": [
+                            {
+                                "from": from_time,
+                                "generationmix": [
+                                    {"fuel": "wind", "perc": 30},
+                                    {"fuel": "gas", "perc": 40},
+                                    {"fuel": "nuclear", "perc": 30},
+                                ],
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "from": from_time,
+                            "to": to_time,
+                            "intensity": {"actual": 104, "forecast": 110, "index": "low"},
+                        }
+                    ]
+                },
+            )
+
+        engine = _tao_engine()
+        Base.metadata.create_all(bind=engine)
+        session = sessionmaker(bind=engine)()
+        transport = httpx.MockTransport(responder)
+        async_client = httpx.AsyncClient
+
+        def client_factory(**kwargs):
+            kwargs["transport"] = transport
+            return async_client(**kwargs)
+
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        end = start + timedelta(days=15)
+        try:
+            with patch.object(collector, "CARBON_API_BASE_URL", "https://carbon.test"), patch.object(
+                collector.httpx, "AsyncClient", client_factory
+            ):
+                first = asyncio.run(collector.thu_thap_khoang_thoi_gian(session, start, end))
+                second = asyncio.run(collector.thu_thap_khoang_thoi_gian(session, start, end))
+
+            self.assertEqual((first.inserted, first.updated), (36, 0))
+            self.assertEqual((second.inserted, second.updated), (0, 36))
+            self.assertEqual(session.query(SoLieuCarbon).count(), 36)
+            self.assertEqual(
+                session.query(SoLieuCarbon).filter(SoLieuCarbon.ma_vung == 18).count(),
+                0,
+            )
+            self.assertEqual(
+                session.query(GenerationMix).count(),
+                2,
+            )
+            self.assertEqual(
+                len([path for path in requests if path.startswith("/regional/intensity/")]),
+                4,
+            )
         finally:
             session.close()
             engine.dispose()

@@ -1,0 +1,78 @@
+name: Carbon data collection
+
+on:
+  schedule:
+    - cron: "0,30 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Chọn thu thập mới nhất hoặc bù dữ liệu lịch sử"
+        required: true
+        type: choice
+        options:
+          - collect
+          - backfill
+        default: collect
+      start_date:
+        description: "Ngày bắt đầu backfill (YYYY-MM-DD, UTC)"
+        required: false
+        type: string
+      end_date:
+        description: "Ngày kết thúc backfill (YYYY-MM-DD, UTC, tính cả ngày này)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: carbon-data-collection
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Run ingestion
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CARBON_API_BASE_URL: https://api.carbonintensity.org.uk
+          CARBON_ALERT_THRESHOLD: ${{ vars.CARBON_ALERT_THRESHOLD || '250' }}
+          CARBON_ALERT_CHANGE_PERCENT: ${{ vars.CARBON_ALERT_CHANGE_PERCENT || '30' }}
+          CARBON_ALERT_WINDOW_HOURS: ${{ vars.CARBON_ALERT_WINDOW_HOURS || '24' }}
+          MODE: ${{ inputs.mode }}
+          START_DATE: ${{ inputs.start_date }}
+          END_DATE: ${{ inputs.end_date }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::GitHub Actions secret DATABASE_URL is not configured."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            python -m dichVu.ingestion_cli --mode collect --source schedule
+          elif [ "$MODE" = "backfill" ]; then
+            if [ -z "$START_DATE" ] || [ -z "$END_DATE" ]; then
+              echo "::error::Backfill requires start_date and end_date."
+              exit 1
+            fi
+            python -m dichVu.ingestion_cli --mode backfill --source dispatch \
+              --start-date "$START_DATE" --end-date "$END_DATE"
+          else
+            python -m dichVu.ingestion_cli --mode collect --source dispatch
+          fi

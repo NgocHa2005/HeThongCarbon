@@ -214,7 +214,12 @@ td { padding: 11px 17px; border-top: 1px solid #eff2f1; color: #69766f; font-siz
 .app-shell .notice-banner { border-color: #f3d9d9; background: #fff6f6; }
 .app-shell .notice-icon { background: #ffe8e8; color: #c62828; }
 .app-shell .notice-banner strong { color: #9f2424; }
+.app-shell .notice-endpoint { color: #ad2929; text-decoration: none; }
 .app-shell .method-pill { background: #ffe5e5; color: #b51f1f; }
+.app-shell .quality-card { margin-top: 15px; padding: 18px 20px; }
+.app-shell .quality-card > p { margin: 12px 0; color: #59645f; font-size: 10px; }
+.app-shell .quality-card > small { color: #7c8982; font-size: 9px; }
+.app-shell .quality-notices { display: grid; gap: 7px; margin: 10px 0; padding-left: 18px; color: #9f2424; font-size: 9px; }
 .app-shell .icon-tile.green { background: #fff0f0; color: #c62828; }
 .app-shell .source-logo { background: #fff4f4; color: #c62828; }
 .app-shell .source-live > span { background: #d32f2f; }

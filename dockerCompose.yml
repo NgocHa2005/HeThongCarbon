@@ -4,8 +4,10 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to your Supabase PostgreSQL URI}
       CARBON_API_BASE_URL: ${CARBON_API_BASE_URL:-https://api.carbonintensity.org.uk}
+      CARBON_ALERT_THRESHOLD: ${CARBON_ALERT_THRESHOLD:-250}
+      CARBON_ALERT_CHANGE_PERCENT: ${CARBON_ALERT_CHANGE_PERCENT:-30}
+      CARBON_ALERT_WINDOW_HOURS: ${CARBON_ALERT_WINDOW_HOURS:-24}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      COLLECTION_INTERVAL_SECONDS: ${COLLECTION_INTERVAL_SECONDS:-1800}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
 
@@ -13,6 +15,7 @@ services:
     build: ./frontend
     environment:
       VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      VITE_GITHUB_ACTIONS_URL: ${VITE_GITHUB_ACTIONS_URL:-https://github.com/NgocHa2005/HeThongCarbon/actions/workflows/carbon-data-collection.yml}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:

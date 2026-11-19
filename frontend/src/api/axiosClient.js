@@ -11,18 +11,13 @@ export async function layTrangThaiThuThap() {
   return data;
 }
 
+export async function layChatLuongDuLieu() {
+  const { data } = await client.get("/api/v1/admin/quality");
+  return data;
+}
+
 export async function layLichSuThuThap() {
   const { data } = await client.get("/api/v1/admin/history");
-  return data;
-}
-
-export async function kichHoatThuThap() {
-  const { data } = await client.post("/api/v1/admin/collect");
-  return data;
-}
-
-export async function dungThuThapDinhKy() {
-  const { data } = await client.post("/api/v1/admin/collect/stop");
   return data;
 }
 

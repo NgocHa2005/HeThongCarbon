@@ -12,27 +12,28 @@ import {
   Cloud,
   Database,
   Download,
+  ExternalLink,
   FileClock,
   Gauge,
   Leaf,
   LoaderCircle,
-  Play,
   RefreshCw,
   ShieldCheck,
-  Square,
   SlidersHorizontal,
   XCircle,
 } from "lucide-react";
 import { taiTepExcel } from "../api/taiTepExcel.js";
 import {
-  kichHoatThuThap,
-  dungThuThapDinhKy,
+  layChatLuongDuLieu,
   layLichSuThuThap,
   layTrangThaiThuThap,
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
 
 const INTERVAL_POLLING = 15000;
+const GITHUB_ACTIONS_URL =
+  import.meta.env.VITE_GITHUB_ACTIONS_URL ||
+  "https://github.com/NgocHa2005/HeThongCarbon/actions/workflows/carbon-data-collection.yml";
 
 function docTrangThai(payload) {
   const job = payload?.data ?? payload?.job ?? payload ?? {};
@@ -71,6 +72,19 @@ function dinhDangThoiGian(value) {
 function hienThiGiaTri(value) {
   if (value === undefined || value === null || value === "") return "—";
   return typeof value === "number" ? new Intl.NumberFormat("vi-VN").format(value) : String(value);
+}
+
+function moTaCanhBao(notice) {
+  const message = notice.message ?? notice.Message ?? notice.AlertMessage ?? notice.description;
+  if (message) return message;
+  const exceeded = notice.ExceededValue ?? notice.exceeded_value;
+  const threshold = notice.ThresholdLimit ?? notice.threshold_limit;
+  if (exceeded !== undefined && threshold !== undefined) {
+    const dismissal = notice.IsDismissed ?? notice.is_dismissed;
+    const state = dismissal === undefined ? "" : dismissal ? " · Đã xử lý" : " · Chưa xử lý";
+    return `Cường độ ${exceeded} gCO₂/kWh vượt ngưỡng ${threshold} gCO₂/kWh (${notice.Severity ?? notice.severity ?? "cảnh báo"})${state}.`;
+  }
+  return JSON.stringify(notice);
 }
 
 function layTrangHienTai() {
@@ -174,12 +188,12 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
   const [jobStatus, setJobStatus] = useState("loading");
-  const [isTriggering, setIsTriggering] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [apiError, setApiError] = useState("");
   const [apiErrorKind, setApiErrorKind] = useState("");
   const [lastChecked, setLastChecked] = useState(null);
-  const [autoCollectEnabled, setAutoCollectEnabled] = useState(false);
+  const [quality, setQuality] = useState(null);
+  const [qualityError, setQualityError] = useState("");
 
   useEffect(() => {
     const syncPage = () => setPage(layTrangHienTai());
@@ -194,7 +208,6 @@ function App() {
       const result = docTrangThai(payload);
       setJob(result.job);
       setJobStatus(result.status);
-      setAutoCollectEnabled(Boolean(result.job?.auto_collect_enabled));
       setApiError("");
       setApiErrorKind("");
       setLastChecked(new Date());
@@ -210,12 +223,25 @@ function App() {
     }
   }, []);
 
+  const refreshQuality = useCallback(async () => {
+    try {
+      setQuality(await layChatLuongDuLieu());
+      setQualityError("");
+    } catch (error) {
+      setQualityError(thongDiepLoiApi(error));
+    }
+  }, []);
+
   useEffect(() => {
     if (page === "history" || page === "configuration") return undefined;
     refreshStatus(true);
-    const timer = window.setInterval(() => refreshStatus(true), INTERVAL_POLLING);
+    refreshQuality();
+    const timer = window.setInterval(() => {
+      refreshStatus(true);
+      refreshQuality();
+    }, INTERVAL_POLLING);
     return () => window.clearInterval(timer);
-  }, [page, refreshStatus]);
+  }, [page, refreshQuality, refreshStatus]);
 
   const refreshHistory = useCallback(async (quiet = false) => {
     if (!quiet) setIsHistoryLoading(true);
@@ -237,63 +263,30 @@ function App() {
     return () => window.clearInterval(timer);
   }, [page, refreshHistory]);
 
-  const trigger = async () => {
-    setIsTriggering(true);
-    setApiError("");
-    setApiErrorKind("");
-    try {
-      const payload = await kichHoatThuThap();
-      const result = docTrangThai(payload);
-      setJob(result.job);
-      setJobStatus(result.status === "unknown" || result.status === "succeeded" ? "running" : result.status);
-      setAutoCollectEnabled(Boolean(result.job?.auto_collect_enabled ?? true));
-      setLastChecked(new Date());
-      await refreshStatus(true);
-    } catch (error) {
-      setApiError(thongDiepLoiApi(error));
-      setApiErrorKind("trigger");
-    } finally {
-      setIsTriggering(false);
-    }
-  };
-
-  const stopSchedule = async () => {
-    setIsTriggering(true);
-    setApiError("");
-    setApiErrorKind("");
-    try {
-      const payload = await dungThuThapDinhKy();
-      const result = docTrangThai(payload);
-      setJob(result.job);
-      setJobStatus(result.status);
-      setAutoCollectEnabled(false);
-      setLastChecked(new Date());
-    } catch (error) {
-      setApiError(thongDiepLoiApi(error));
-      setApiErrorKind("trigger");
-    } finally {
-      setIsTriggering(false);
-    }
-  };
-
   const stages = useMemo(() => layBuoc(job, jobStatus), [job, jobStatus]);
-  const isBusy = isTriggering || jobStatus === "running" || jobStatus === "queued";
   const timestamp = job?.started_at ?? job?.startedAt ?? job?.created_at ?? job?.createdAt ?? job?.updated_at;
   const records = job?.records_processed ?? job?.recordsProcessed ?? job?.records_count ?? job?.recordsCount ?? job?.record_count;
   const duration = job?.duration_seconds ?? job?.durationSeconds ?? job?.duration;
   const errorMessage = job?.error ?? job?.message ?? job?.detail;
   const displayedError = jobStatus === "failed" && errorMessage ? errorMessage : apiError;
+  const monitoring = job?.monitoring;
+  const qualityNotices = [
+    ...(quality?.warnings || []),
+    ...(quality?.alerts || []),
+  ];
 
   const exportHistory = async () => {
     setIsExporting(true);
     setExportError("");
     try {
-      const headers = ["Mã tiến trình", "Thời gian bắt đầu", "Trạng thái", "Số bản ghi", "Thời lượng (giây)", "Thông báo"];
+      const headers = ["Mã tiến trình", "Thời gian bắt đầu", "Nguồn chạy", "Trạng thái", "Bản ghi thêm", "Bản ghi cập nhật", "Thời lượng (giây)", "Thông báo"];
       const rows = history.map((entry) => [
         entry?.job_id ?? entry?.jobId ?? entry?.id ?? "",
         entry?.started_at ?? entry?.startedAt ?? entry?.created_at ?? entry?.createdAt ?? "",
+        entry?.triggered_by ?? "",
         entry?.status ?? entry?.state ?? entry?.trangThai ?? "",
-        entry?.records_processed ?? entry?.recordsProcessed ?? entry?.records_count ?? entry?.recordsCount ?? "",
+        entry?.records_inserted ?? 0,
+        entry?.records_updated ?? 0,
         entry?.duration_seconds ?? entry?.durationSeconds ?? entry?.duration ?? "",
         entry?.error ?? entry?.message ?? "",
       ]);
@@ -350,24 +343,27 @@ function App() {
                 </div>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>TIẾN TRÌNH</th><th>THỜI GIAN</th><th>BẢN GHI</th><th>THỜI LƯỢNG</th><th>TRẠNG THÁI</th></tr></thead>
+                    <thead><tr><th>TIẾN TRÌNH</th><th>THỜI GIAN</th><th>NGUỒN CHẠY</th><th>THÊM MỚI</th><th>CẬP NHẬT</th><th>THỜI LƯỢNG</th><th>TRẠNG THÁI</th></tr></thead>
                     <tbody>
                       {history.length ? history.map((entry, index) => {
                         const status = docTrangThai(entry).status;
                         const startedAt = entry?.started_at ?? entry?.startedAt ?? entry?.created_at ?? entry?.createdAt;
-                        const recordCount = entry?.records_processed ?? entry?.recordsProcessed ?? entry?.records_count ?? entry?.recordsCount ?? entry?.record_count;
+                        const recordsInserted = entry?.records_inserted ?? 0;
+                        const recordsUpdated = entry?.records_updated ?? 0;
                         const elapsed = entry?.duration_seconds ?? entry?.durationSeconds ?? entry?.duration;
                         return (
                           <tr key={entry?.job_id ?? entry?.jobId ?? entry?.id ?? `${startedAt}-${index}`}>
                             <td><span className="table-job-id">{entry?.job_id ?? entry?.jobId ?? entry?.id ?? "—"}</span></td>
                             <td>{dinhDangThoiGian(startedAt)}</td>
-                            <td>{hienThiGiaTri(recordCount)}</td>
+                            <td>{entry?.triggered_by ?? "—"}</td>
+                            <td>{hienThiGiaTri(recordsInserted)}</td>
+                            <td>{hienThiGiaTri(recordsUpdated)}</td>
                             <td>{elapsed === undefined ? "—" : `${hienThiGiaTri(elapsed)} giây`}</td>
                             <td><StatusBadge status={status} /></td>
                           </tr>
                         );
                       }) : (
-                        <tr><td colSpan="5"><div className="empty-state"><span className="empty-icon"><FileClock size={18} /></span><strong>{isHistoryLoading ? "Đang tải lịch sử..." : historyError ? "Chưa thể hiển thị lịch sử" : "Chưa có lịch sử thu thập"}</strong><small>{historyError ? "Hãy kiểm tra kết nối và endpoint lịch sử của backend." : "Lịch sử sẽ xuất hiện tại đây sau khi backend trả về các tiến trình."}</small></div></td></tr>
+                        <tr><td colSpan="7"><div className="empty-state"><span className="empty-icon"><FileClock size={18} /></span><strong>{isHistoryLoading ? "Đang tải lịch sử..." : historyError ? "Chưa thể hiển thị lịch sử" : "Chưa có lịch sử thu thập"}</strong><small>{historyError ? "Hãy kiểm tra kết nối và endpoint lịch sử của backend." : "Lịch sử sẽ xuất hiện tại đây sau khi backend trả về các tiến trình."}</small></div></td></tr>
                       )}
                     </tbody>
                   </table>
@@ -402,8 +398,19 @@ function App() {
 
           <section className="notice-banner">
             <span className="notice-icon"><ShieldCheck size={18} /></span>
-            <span><strong>Luồng dữ liệu an toàn</strong><small>Dữ liệu được lấy từ Carbon Intensity API, làm sạch và lưu vào cơ sở dữ liệu.</small></span>
-            <span className="notice-endpoint"><span className="method-pill">POST</span> /api/v1/admin/collect</span>
+            <span>
+              <strong>
+                {monitoring?.state === "healthy"
+                  ? "Lịch thu thập đang hoạt động"
+                  : monitoring?.state === "running"
+                    ? "GitHub Actions đang thu thập dữ liệu"
+                    : "Cần kiểm tra lịch thu thập"}
+              </strong>
+              <small>{monitoring?.message || `GitHub Actions tự chạy mỗi 30 phút. Lần thành công gần nhất: ${dinhDangThoiGian(monitoring?.last_success_at)}.`}</small>
+            </span>
+            <a className="notice-endpoint" href={GITHUB_ACTIONS_URL} target="_blank" rel="noreferrer">
+              <ExternalLink size={14} /> GitHub Actions
+            </a>
           </section>
 
           {displayedError && (
@@ -420,22 +427,20 @@ function App() {
             <article className="card trigger-card">
               <div className="card-topline">
                 <div className="icon-tile green"><Cloud size={19} /></div>
-                  <span className="card-kicker">ĐỒNG BỘ TỰ ĐỘNG</span>
+                <span className="card-kicker">GITHUB ACTIONS</span>
                 <span className="secure-label"><ShieldCheck size={13} /> ADMIN</span>
               </div>
-              <h2>Kích hoạt thu thập dữ liệu</h2>
-              <p className="card-description">Bật một lần để hệ thống thu thập ngay và tự động lặp lại sau mỗi 30 phút.</p>
+              <h2>Chạy thủ công hoặc bù dữ liệu</h2>
+              <p className="card-description">Mở workflow để chạy ngay hoặc chọn khoảng ngày cần bù. Lịch tự động được GitHub Actions quản lý.</p>
               <div className="source-row">
                 <div className="source-logo"><Activity size={16} /></div>
                 <div><strong>Carbon Intensity API</strong><small>api.carbonintensity.org.uk</small></div>
                 <span className="source-live"><span /> NGUỒN HOẠT ĐỘNG</span>
               </div>
-              <button className={`button ${autoCollectEnabled ? "button-secondary" : "button-primary"} trigger-button`} onClick={autoCollectEnabled ? stopSchedule : trigger} disabled={isTriggering}>
-                {isTriggering ? <LoaderCircle size={17} className="spin" /> : autoCollectEnabled ? <Square size={15} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
-                {isTriggering ? "Đang cập nhật..." : autoCollectEnabled ? "Dừng thu thập tự động" : "Bật thu thập mỗi 30 phút"}
-                {!isTriggering && !autoCollectEnabled && <ArrowRight size={16} className="button-arrow" />}
-              </button>
-              <div className="trigger-footnote"><Clock3 size={13} /> {autoCollectEnabled ? "Đang tự động thu thập mỗi 30 phút." : "Bấm nút để bắt đầu lịch thu thập."}</div>
+              <a className="button button-primary trigger-button" href={GITHUB_ACTIONS_URL} target="_blank" rel="noreferrer">
+                <ExternalLink size={16} /> Mở workflow thu thập <ArrowRight size={16} className="button-arrow" />
+              </a>
+              <div className="trigger-footnote"><Clock3 size={13} /> Lịch cron tự chạy; chạy thủ công/backfill trong tab Actions.</div>
             </article>
 
             <article className="card status-card">
@@ -474,6 +479,41 @@ function App() {
               <div className={`metric-icon ${jobStatus === "failed" ? "red" : "green"}`}>{jobStatus === "failed" ? <XCircle size={17} /> : <CheckCircle2 size={17} />}</div>
               <div className="metric-copy"><span>KẾT QUẢ GẦN NHẤT</span><strong className={`result-text result-${jobStatus}`}>{jobStatus === "loading" ? "Đang kiểm tra" : jobStatus === "unknown" ? "Chưa xác định" : jobStatus === "succeeded" ? "Thành công" : jobStatus === "failed" ? "Thất bại" : "Đang chạy"}</strong><small>{timestamp ? dinhDangThoiGian(timestamp) : "Đang chờ dữ liệu từ API"}</small></div>
             </article>
+          </section>
+
+          <section className="card quality-card" aria-label="Giám sát chất lượng dữ liệu">
+            <div className="card-heading">
+              <div><div className="card-kicker">INGESTION MONITORING</div><h2>Chất lượng dữ liệu & cảnh báo</h2></div>
+              <StatusBadge status={qualityError ? "failed" : quality?.quality_state === "healthy" ? "succeeded" : quality ? "failed" : "loading"} />
+            </div>
+            {qualityError ? (
+              <p role="alert">{qualityError}</p>
+            ) : quality ? (
+              <>
+                <p>
+                  Vùng đã cấu hình: {quality.known_region_count}/18 ·
+                  Dữ liệu quốc gia mới nhất: {dinhDangThoiGian(quality.latest_national_reading_at)} ·
+                  Cơ cấu nguồn điện: {quality.latest_generation_mix_present ? "đủ" : "thiếu"}
+                </p>
+                {qualityNotices.length ? (
+                  <ul className="quality-notices">
+                    {qualityNotices.map((notice, index) => (
+                      <li key={notice.code ?? notice.AlertId ?? notice.alert_id ?? index}>
+                        {moTaCanhBao(notice)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : <p>Không phát hiện cảnh báo chất lượng dữ liệu.</p>}
+                <small>
+                  Ngưỡng cảnh báo: &gt;{quality.alert_rules?.absolute_threshold_gco2_per_kwh} gCO₂/kWh hoặc tăng &gt;{quality.alert_rules?.change_percent}% so với trung bình {quality.alert_rules?.window_hours} giờ trước.
+                </small>
+                <small>
+                  Bảng downstream: {Object.entries(quality.downstream_tables || {})
+                    .map(([name, exists]) => `${name} ${exists ? "có" : "chưa có"}`)
+                    .join(" · ")}
+                </small>
+              </>
+            ) : <p>Đang kiểm tra chất lượng dữ liệu...</p>}
           </section>
 
           <footer className="page-footer"><span>Admin <span className="footer-dot">·</span> Tổng quan</span><span><ArrowDownToLine size={13} /> Trạng thái cập nhật tự động</span></footer>

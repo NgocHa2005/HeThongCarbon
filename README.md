@@ -20,7 +20,18 @@ DATABASE_URL=postgresql://postgres.lyqhwrpbrwhmllftckmb:<MAT_KHAU_DA_URL_ENCODE>
 
 Thay placeholder mật khẩu bằng mật khẩu database đã URL-encode. Giữ nguyên các biến khác trong `.env`; không đưa mật khẩu hoặc API key vào Git hay chat.
 
-### 2. Build và khởi động
+### 2. Cấu hình GitHub Actions
+
+Workflow `.github/workflows/carbon-data-collection.yml` chạy thu thập dữ liệu mới nhất vào phút 00 và 30 mỗi giờ. Để runner kết nối Supabase mà không lưu mật khẩu trong Git:
+
+1. Mở GitHub repository → **Settings → Secrets and variables → Actions**.
+2. Tạo repository secret tên `DATABASE_URL`, giá trị là URI PostgreSQL Supabase đã URL-encode mật khẩu và bật `sslmode=require`.
+3. Tùy chọn, tạo Actions variables `CARBON_ALERT_THRESHOLD=250`, `CARBON_ALERT_CHANGE_PERCENT=30` và `CARBON_ALERT_WINDOW_HOURS=24`.
+4. Vào **Actions**, bật workflow nếu GitHub yêu cầu. Workflow phải có trên branch mặc định (`main`).
+
+Không đưa URI vào file workflow, commit, log hoặc nội dung chat. GitHub Actions chạy scraper trực tiếp; backend web không còn lập lịch hoặc gọi Carbon API.
+
+### 3. Khởi động giao diện admin và API
 
 Chạy tại thư mục gốc dự án:
 
@@ -29,41 +40,38 @@ docker compose -f dockerCompose.yml up --build -d
 docker compose -f dockerCompose.yml ps
 ```
 
-Compose khởi động frontend và backend; backend kết nối Supabase qua `DATABASE_URL`, không chạy SQL Server. Theo dõi log backend:
+Docker chỉ khởi động API và giao diện; lịch thu thập vẫn do GitHub Actions chạy kể cả khi Docker tắt.
+
+### 3.1. Các worker thuật toán độc lập
+
+Ba worker có entry point riêng, chạy từ thư mục `backend` trong các terminal riêng:
 
 ```powershell
-docker compose -f dockerCompose.yml logs -f backend
+python -m workers.analysis --check
+python -m workers.clustering --check
+python -m workers.prediction --check
 ```
 
-### 3. Thu thập dữ liệu lần đầu và tự động mỗi 30 phút
+`--check` chỉ xác nhận khung entry point; không chạy thuật toán hay ghi kết quả. Thuật toán của ba worker chưa được triển khai, nên chạy lệnh không có `--check` sẽ thoát với mã lỗi thay vì báo thành công giả. Khi nhóm phụ trách bổ sung thuật toán, phần xử lý và hợp đồng dữ liệu sẽ được tích hợp vào đúng worker tương ứng.
 
-Backend không tự thu thập khi khởi động. Vào `/admin` và bấm **Bật thu thập mỗi 30 phút** một lần. Hệ thống sẽ:
+### 4. Chạy thủ công hoặc bù dữ liệu
 
-1. Cào dữ liệu ngay lập tức.
-2. Tự cào lại sau mỗi 1.800 giây (30 phút).
-3. Chỉ dừng khi bấm **Dừng thu thập tự động**.
+Trong trang GitHub Actions, mở **Carbon data collection → Run workflow**:
 
-Có thể bật bằng API:
+- `collect`: lấy dữ liệu mới nhất ngay.
+- `backfill`: nhập `start_date` và `end_date` theo `YYYY-MM-DD` (UTC); cả hai ngày đều được tính.
 
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/admin/collect
-Invoke-RestMethod -Uri http://localhost:8000/api/v1/admin/status
-```
+Workflow chia backfill thành các request tối đa 14 ngày và giới hạn mỗi lần chạy tối đa 730 ngày. Các bản ghi được upsert theo vùng và thời điểm, nên chạy lại cùng khoảng không tạo bản ghi trùng.
 
-Lịch chạy nằm ở backend, vì vậy không cần giữ trang admin mở. Lịch này sẽ dừng khi backend/container khởi động lại và cần bật lại.
+Trang `/admin` có liên kết mở workflow để chạy thủ công hoặc backfill. Lịch tự động không có nút dừng trong backend; có thể tắt workflow trong tab **Actions** hoặc sửa cron trong file workflow.
 
-### 4. Cào lịch sử hai năm
+### 5. Theo dõi trạng thái và chất lượng
 
-Carbon Intensity API có endpoint lịch sử, nhưng không chấp nhận một request kéo dài hai năm. Backend chia khoảng thời gian thành các cửa sổ tối đa 14 ngày để tránh lỗi giới hạn nguồn và cào tối đa 730 ngày:
+Các phiên từ cron và workflow dispatch đều ghi vào `SYS_INGESTION_RUNS`, bao gồm nguồn kích hoạt, thời gian chạy, `SUCCESS`/`FAILED`, số bản ghi thêm/cập nhật và thông báo lỗi. Màn admin kiểm tra lần thành công gần nhất và cảnh báo khi quá 45 phút chưa có lần thành công.
 
-```powershell
-Invoke-RestMethod -Method Post -Uri "http://localhost:8000/api/v1/admin/collect/history?days=730"
-Invoke-RestMethod -Uri http://localhost:8000/api/v1/admin/status
-```
+Endpoint `GET /api/v1/admin/quality` kiểm tra vùng `0–17`, dữ liệu vùng gần đây, cơ cấu nguồn điện, tổng phần trăm và sự hiện diện của các bảng downstream. Trang admin đọc tối đa 100 cảnh báo mới nhất từ `SYS_CARBON_ALERTS`. Khi chạy thu thập mới nhất, GitHub Actions ghi một cảnh báo cho bản ghi quốc gia nếu cường độ vượt `250 gCO₂/kWh` hoặc tăng hơn `30%` so với trung bình của 24 giờ trước đó (48 khoảng 30 phút). Cảnh báo tuyệt đối có mức `HIGH`; cảnh báo biến động có mức `MEDIUM`. Backfill lịch sử không phát sinh cảnh báo hồi tố.
 
-Quá trình này có thể mất thời gian và tạo khoảng 35.000 bản ghi quốc gia, cùng dữ liệu vùng và tỷ lệ nguồn điện tương ứng. Không chạy đồng thời với một lần thu thập khác.
-
-Lần thu thập đầu sẽ lưu dữ liệu toàn quốc với `RegionId = 0` (`GB`) và đồng bộ các vùng được `/regional` trả về (IDs 1–17). Backend dùng các bảng `DIM_REGIONS`, `FACT_CARBON_READINGS`, `FACT_GENERATION_MIX` và `SYS_INGESTION_RUNS`. SQLAlchemy tạo bảng cần thiết nếu chưa tồn tại, nhưng không sửa cấu trúc bảng đã có hoặc chuyển dữ liệu cũ.
+Lần thu thập ghi dữ liệu toàn quốc với `RegionId = 0` (`GB`) và dữ liệu vùng được `/regional` trả về. Backend dùng `DIM_REGIONS`, `FACT_CARBON_READINGS`, `FACT_GENERATION_MIX` và `SYS_INGESTION_RUNS`.
 
 ### Địa chỉ ứng dụng
 
@@ -72,7 +80,7 @@ Lần thu thập đầu sẽ lưu dữ liệu toàn quốc với `RegionId = 0` 
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 
-Trang `/admin` hiện chỉ là giao diện quản trị, chưa có đăng nhập hoặc phân quyền.
+Trang `/admin` chưa có đăng nhập hoặc phân quyền; giới hạn quyền truy cập repository và GitHub Actions.
 
 ### Dừng ứng dụng
 
@@ -88,11 +96,9 @@ Lệnh này chỉ dừng container, không xóa dữ liệu Supabase.
 - `GET /api/v1/carbon/history`: chuỗi cường độ carbon.
 - `GET /api/v1/regions`: dữ liệu theo vùng.
 - `GET /api/v1/analysis/forecast`: dự báo cơ sở 24 giờ tiếp theo.
-- `GET /api/v1/admin/status`: trạng thái lần thu thập gần nhất.
+- `GET /api/v1/admin/status`: trạng thái phiên mới nhất và tình trạng lịch thu thập.
 - `GET /api/v1/admin/history`: lịch sử thu thập.
-- `POST /api/v1/admin/collect`: bật thu thập ngay và tự động mỗi 30 phút.
-- `POST /api/v1/admin/collect/stop`: dừng lịch thu thập tự động; không hủy tiến trình đang chạy.
-- `POST /api/v1/admin/collect/history?days=730`: cào dữ liệu lịch sử tối đa 730 ngày theo từng cửa sổ.
+- `GET /api/v1/admin/quality`: kiểm tra dữ liệu, bảng cảnh báo và bảng downstream.
 - `GET /health`: kiểm tra backend.
 
 Nguồn dữ liệu: [Carbon Intensity API](https://carbonintensity.org.uk/). API dự báo hiện dùng baseline trung bình tối đa 48 bản ghi gần nhất và ghi rõ phương pháp trong kết quả; mô hình ML lưu trong `backend/khoLuuMoHinh/` là tùy chọn.
