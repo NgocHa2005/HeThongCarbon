@@ -1,3 +1,6 @@
-from . import chiSoHieuNang, duLieuKhuVuc, soLieuCarbon
+from moHinhDl.duLieuKhuVuc import DuLieuKhuVuc
+from moHinhDl.luotThuThap import LuotThuThap
+from moHinhDl.soLieuCarbon import SoLieuCarbon
+from moHinhDl.tyLeNguonDien import GenerationMix
 
-__all__ = ["chiSoHieuNang", "duLieuKhuVuc", "soLieuCarbon"]
+__all__ = ["DuLieuKhuVuc", "GenerationMix", "LuotThuThap", "SoLieuCarbon"]
