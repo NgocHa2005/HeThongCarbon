@@ -19,12 +19,14 @@ import {
   Play,
   RefreshCw,
   ShieldCheck,
+  Square,
   SlidersHorizontal,
   XCircle,
 } from "lucide-react";
 import { taiTepExcel } from "../api/taiTepExcel.js";
 import {
   kichHoatThuThap,
+  dungThuThapDinhKy,
   layLichSuThuThap,
   layTrangThaiThuThap,
   thongDiepLoiApi,
@@ -177,6 +179,7 @@ function App() {
   const [apiError, setApiError] = useState("");
   const [apiErrorKind, setApiErrorKind] = useState("");
   const [lastChecked, setLastChecked] = useState(null);
+  const [autoCollectEnabled, setAutoCollectEnabled] = useState(false);
 
   useEffect(() => {
     const syncPage = () => setPage(layTrangHienTai());
@@ -191,6 +194,7 @@ function App() {
       const result = docTrangThai(payload);
       setJob(result.job);
       setJobStatus(result.status);
+      setAutoCollectEnabled(Boolean(result.job?.auto_collect_enabled));
       setApiError("");
       setApiErrorKind("");
       setLastChecked(new Date());
@@ -242,8 +246,28 @@ function App() {
       const result = docTrangThai(payload);
       setJob(result.job);
       setJobStatus(result.status === "unknown" || result.status === "succeeded" ? "running" : result.status);
+      setAutoCollectEnabled(Boolean(result.job?.auto_collect_enabled ?? true));
       setLastChecked(new Date());
       await refreshStatus(true);
+    } catch (error) {
+      setApiError(thongDiepLoiApi(error));
+      setApiErrorKind("trigger");
+    } finally {
+      setIsTriggering(false);
+    }
+  };
+
+  const stopSchedule = async () => {
+    setIsTriggering(true);
+    setApiError("");
+    setApiErrorKind("");
+    try {
+      const payload = await dungThuThapDinhKy();
+      const result = docTrangThai(payload);
+      setJob(result.job);
+      setJobStatus(result.status);
+      setAutoCollectEnabled(false);
+      setLastChecked(new Date());
     } catch (error) {
       setApiError(thongDiepLoiApi(error));
       setApiErrorKind("trigger");
@@ -396,22 +420,22 @@ function App() {
             <article className="card trigger-card">
               <div className="card-topline">
                 <div className="icon-tile green"><Cloud size={19} /></div>
-                <span className="card-kicker">ĐỒNG BỘ THỦ CÔNG</span>
+                  <span className="card-kicker">ĐỒNG BỘ TỰ ĐỘNG</span>
                 <span className="secure-label"><ShieldCheck size={13} /> ADMIN</span>
               </div>
               <h2>Kích hoạt thu thập dữ liệu</h2>
-              <p className="card-description">Yêu cầu hệ thống lấy dữ liệu mới, chuẩn hóa và nạp vào cơ sở dữ liệu ngay lập tức.</p>
+              <p className="card-description">Bật một lần để hệ thống thu thập ngay và tự động lặp lại sau mỗi 30 phút.</p>
               <div className="source-row">
                 <div className="source-logo"><Activity size={16} /></div>
                 <div><strong>Carbon Intensity API</strong><small>api.carbonintensity.org.uk</small></div>
                 <span className="source-live"><span /> NGUỒN HOẠT ĐỘNG</span>
               </div>
-              <button className="button button-primary trigger-button" onClick={trigger} disabled={isBusy}>
-                {isTriggering ? <LoaderCircle size={17} className="spin" /> : <Play size={16} fill="currentColor" />}
-                {isTriggering ? "Đang gửi yêu cầu..." : isBusy ? "Đang xử lý dữ liệu" : "Thu thập dữ liệu ngay"}
-                {!isBusy && <ArrowRight size={16} className="button-arrow" />}
+              <button className={`button ${autoCollectEnabled ? "button-secondary" : "button-primary"} trigger-button`} onClick={autoCollectEnabled ? stopSchedule : trigger} disabled={isTriggering}>
+                {isTriggering ? <LoaderCircle size={17} className="spin" /> : autoCollectEnabled ? <Square size={15} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
+                {isTriggering ? "Đang cập nhật..." : autoCollectEnabled ? "Dừng thu thập tự động" : "Bật thu thập mỗi 30 phút"}
+                {!isTriggering && !autoCollectEnabled && <ArrowRight size={16} className="button-arrow" />}
               </button>
-              <div className="trigger-footnote"><Clock3 size={13} /> Tiến trình có thể mất vài giây để hoàn tất.</div>
+              <div className="trigger-footnote"><Clock3 size={13} /> {autoCollectEnabled ? "Đang tự động thu thập mỗi 30 phút." : "Bấm nút để bắt đầu lịch thu thập."}</div>
             </article>
 
             <article className="card status-card">

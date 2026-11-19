@@ -21,6 +21,11 @@ export async function kichHoatThuThap() {
   return data;
 }
 
+export async function dungThuThapDinhKy() {
+  const { data } = await client.post("/api/v1/admin/collect/stop");
+  return data;
+}
+
 export async function layCarbonMoiNhat() {
   const { data } = await client.get("/api/v1/carbon/latest");
   return data;

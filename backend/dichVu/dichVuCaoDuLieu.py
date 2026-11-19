@@ -1,6 +1,6 @@
 import asyncio
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable
 
 import httpx
@@ -44,7 +44,7 @@ def _lay_mix_nguon_dien(generation_result: dict | Exception) -> dict | None:
     if isinstance(generation_result, Exception):
         return None
 
-    generation_data = generation_result.get("data") or {}
+    generation_data = generation_result.get("data") or generation_result
     mix = {
         entry.get("fuel", "").lower(): float(entry.get("perc") or 0)
         for entry in generation_data.get("generationmix", [])
@@ -206,4 +206,77 @@ async def thu_thap_du_lieu(
                 updated += 1
 
     db.commit()
+    return KetQuaThuThap(inserted=inserted, updated=updated)
+
+
+async def thu_thap_lich_su_du_lieu(
+    db: Session,
+    so_ngay: int = 730,
+    cap_nhat_giai_doan: Callable[[str], None] | None = None,
+) -> KetQuaThuThap:
+    """Fetch the last two years in API-sized windows instead of one large request."""
+    so_ngay = min(max(int(so_ngay), 1), 730)
+    ket_thuc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    bat_dau = ket_thuc - timedelta(days=so_ngay)
+    inserted = 0
+    updated = 0
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        cursor = bat_dau
+        while cursor < ket_thuc:
+            window_end = min(cursor + timedelta(days=14), ket_thuc)
+            start_text = cursor.strftime("%Y-%m-%dT%H:%MZ")
+            end_text = window_end.strftime("%Y-%m-%dT%H:%MZ")
+            intensity_result, generation_result, regional_result = await asyncio.gather(
+                _lay_json(client, f"intensity/{start_text}/{end_text}"),
+                _lay_json(client, f"generation/{start_text}/{end_text}"),
+                _lay_json(client, f"regional/{start_text}/{end_text}"),
+                return_exceptions=True,
+            )
+            if isinstance(intensity_result, Exception):
+                raise RuntimeError(f"Không thể lấy lịch sử cường độ carbon: {intensity_result}") from intensity_result
+
+            _upsert_vung(db, GLOBAL_REGION_ID, GLOBAL_REGION_SHORT_NAME, GLOBAL_REGION_FULL_NAME)
+            generation_by_time = {}
+            if not isinstance(generation_result, Exception):
+                generation_by_time = {
+                    item.get("from"): _lay_mix_nguon_dien(item)
+                    for item in generation_result.get("data") or []
+                    if item.get("from")
+                }
+            for period in intensity_result.get("data") or []:
+                if _upsert_reading(
+                    db,
+                    GLOBAL_REGION_ID,
+                    period,
+                    generation_by_time.get(period.get("from")),
+                ):
+                    inserted += 1
+                else:
+                    updated += 1
+
+            if not isinstance(regional_result, Exception):
+                for regional_period in regional_result.get("data") or []:
+                    for region in regional_period.get("regions") or []:
+                        region_id = region.get("regionid")
+                        short_name = region.get("shortname") or region.get("name")
+                        full_name = region.get("name") or short_name
+                        if region_id is None or int(region_id) <= 0 or not short_name:
+                            continue
+                        region_record = {
+                            "from": regional_period.get("from"),
+                            "to": regional_period.get("to"),
+                            "intensity": region.get("intensity") or {},
+                        }
+                        _upsert_vung(db, int(region_id), short_name, full_name)
+                        if _upsert_reading(db, int(region_id), region_record):
+                            inserted += 1
+                        else:
+                            updated += 1
+
+            db.commit()
+            cursor = window_end
+            if cap_nhat_giai_doan:
+                cap_nhat_giai_doan("database")
+
     return KetQuaThuThap(inserted=inserted, updated=updated)
