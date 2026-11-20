@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from cauHinh.ketNoiDb import lay_phien_db
-from cauHinh.thongSoChung import GLOBAL_REGION_ID
-from moHinhDl import DuLieuKhuVuc, SoLieuCarbon
+from backend.config.ketNoiDb_config import lay_phien_db
+from backend.config.settings import GLOBAL_REGION_ID
+from models import DuLieuKhuVuc, SoLieuCarbon
 
 router = APIRouter(prefix="/api/v1", tags=["Dữ liệu công khai"])
 

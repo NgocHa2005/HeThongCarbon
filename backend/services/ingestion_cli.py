@@ -1,7 +1,7 @@
 import argparse
 from datetime import datetime, time, timedelta, timezone
 
-from dichVu.dichVuIngestion import tao_luot_thu_thap, thuc_hien_luot_thu_thap
+from backend.services.Ingestion_service import tao_luot_thu_thap, thuc_hien_luot_thu_thap
 
 
 def _doc_ngay(value: str) -> datetime:

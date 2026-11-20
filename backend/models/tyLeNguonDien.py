@@ -1,7 +1,7 @@
 from sqlalchemy import BigInteger, Column, ForeignKey, Integer, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 
-from cauHinh.ketNoiDb import Base
+from backend.config.database import Base
 
 
 class GenerationMix(Base):

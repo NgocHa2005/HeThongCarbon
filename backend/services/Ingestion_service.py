@@ -1,12 +1,12 @@
 import asyncio
 from datetime import datetime, timezone
 
-from cauHinh.ketNoiDb import SessionLocal
-from dichVu.dichVuCaoDuLieu import (
+from backend.config.ketNoiDb_config import SessionLocal
+from backend.services.caoDuLieu_service import (
     thu_thap_du_lieu,
     thu_thap_khoang_thoi_gian,
 )
-from moHinhDl import LuotThuThap
+from models import LuotThuThap
 
 
 def tao_luot_thu_thap(nguoi_kich_hoat: str) -> int:

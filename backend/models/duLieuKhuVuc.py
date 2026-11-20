@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.orm import relationship
 
-from cauHinh.ketNoiDb import Base
+from backend.config.database import Base
 
 
 class DuLieuKhuVuc(Base):

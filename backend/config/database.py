@@ -1,7 +1,12 @@
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./carbon.db")
 if DATABASE_URL.startswith("postgres://"):
@@ -14,7 +19,6 @@ if DATABASE_URL.startswith("sqlite"):
 
 engine = create_engine(DATABASE_URL, **engine_options)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
 
 
 def lay_phien_db():
@@ -23,3 +27,7 @@ def lay_phien_db():
         yield db
     finally:
         db.close()
+
+
+class Base(DeclarativeBase):
+    pass

@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, Float, Integer, String, func
 
-from cauHinh.ketNoiDb import Base
+from backend.config.database import Base
 
 
 class ChiSoHieuNang(Base):

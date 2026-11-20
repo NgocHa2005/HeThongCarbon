@@ -7,13 +7,13 @@ import httpx
 from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 
-from cauHinh.thongSoChung import (
+from backend.config.settings import (
     CARBON_API_BASE_URL,
     GLOBAL_REGION_FULL_NAME,
     GLOBAL_REGION_ID,
     GLOBAL_REGION_SHORT_NAME,
 )
-from moHinhDl import DuLieuKhuVuc, GenerationMix, SoLieuCarbon
+from models import DuLieuKhuVuc, GenerationMix, SoLieuCarbon
 
 
 @dataclass(frozen=True)
@@ -336,7 +336,7 @@ async def thu_thap_du_lieu(
         )
         .one()
     )
-    from dichVu.dichVuCanhBao import kiem_tra_canh_bao_cuong_do
+    from services.dichVuCanhBao import kiem_tra_canh_bao_cuong_do
 
     kiem_tra_canh_bao_cuong_do(db, national_reading)
 

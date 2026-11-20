@@ -4,13 +4,13 @@ from sqlalchemy import MetaData, Table, inspect, select
 from sqlalchemy.sql import quoted_name
 from sqlalchemy.orm import Session
 
-from cauHinh.thongSoChung import (
+from backend.config.settings import (
     CARBON_ALERT_CHANGE_PERCENT,
     CARBON_ALERT_THRESHOLD,
     CARBON_ALERT_WINDOW_HOURS,
     GLOBAL_REGION_ID,
 )
-from moHinhDl import SoLieuCarbon
+from models import SoLieuCarbon
 
 
 def _lay_bang_canh_bao(db: Session) -> tuple[Table | None, dict[str, object]]:

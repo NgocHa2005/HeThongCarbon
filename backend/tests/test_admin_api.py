@@ -10,13 +10,13 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from cauHinh.ketNoiDb import Base
-import cauHinh.ketNoiDb as database
-import dichVu.dichVuCanhBao as alerts
-import dichVu.dichVuCaoDuLieu as collector
-from dichVu.ingestion_cli import _ma_kich_hoat, _phan_tich_tham_so
+from backend.config.database import Base
+import backend.config.database as database
+import backend.services.canhBao_service as alerts
+import backend.services.caoDuLieu_service as collector
+from services.ingestion_cli import _ma_kich_hoat, _phan_tich_tham_so
 import main
-from moHinhDl import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
+from models import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
 
 
 def _tao_engine():

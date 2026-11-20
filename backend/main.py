@@ -3,11 +3,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from cauHinh.ketNoiDb import Base, engine
-from cauHinh.thongSoChung import CORS_ORIGINS
-from dinhTuyen.tuyenCongKhai import router as public_router
-from dinhTuyen.tuyenQuanTri import router as admin_router
-from moHinhDl import DuLieuKhuVuc, LuotThuThap, SoLieuCarbon
+from backend.config.database import Base, engine
+from backend.config.settings import CORS_ORIGINS
+from routers.tuyenCongKhai import router as public_router
+from backend.routers.quanTri_router import router as admin_router
+from models import DuLieuKhuVuc, LuotThuThap, SoLieuCarbon
 
 
 @asynccontextmanager

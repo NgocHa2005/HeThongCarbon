@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import quoted_name
 from fastapi.encoders import jsonable_encoder
 
-from cauHinh.ketNoiDb import lay_phien_db
-from cauHinh.thongSoChung import (
+from backend.config.ketNoiDb_config import lay_phien_db
+from backend.config.settings import (
     CARBON_ALERT_CHANGE_PERCENT,
     CARBON_ALERT_THRESHOLD,
     CARBON_ALERT_WINDOW_HOURS,
 )
-from moHinhDl import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
+from models import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Quản trị"])
 COLLECTION_INTERVAL_SECONDS = 1800

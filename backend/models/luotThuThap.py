@@ -1,6 +1,6 @@
 from sqlalchemy import BigInteger, Column, DateTime, Integer, String, Text, func
 
-from cauHinh.ketNoiDb import Base
+from backend.config.database import Base
 
 
 class LuotThuThap(Base):
