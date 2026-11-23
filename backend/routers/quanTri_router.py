@@ -6,13 +6,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import quoted_name
 from fastapi.encoders import jsonable_encoder
 
-from config.database import lay_phien_db
-from config.settings import (
+from backend.config.ketNoiDb_config import lay_phien_db
+from backend.config.settings import (
     CARBON_ALERT_CHANGE_PERCENT,
     CARBON_ALERT_THRESHOLD,
     CARBON_ALERT_WINDOW_HOURS,
 )
-from models import DimRegion as DuLieuKhuVuc, FactGenerationMix as GenerationMix, SysIngestionRun as LuotThuThap, FactCarbonReading as SoLieuCarbon
+from models import DuLieuKhuVuc, GenerationMix, LuotThuThap, SoLieuCarbon
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Quản trị"])
 COLLECTION_INTERVAL_SECONDS = 1800
@@ -33,39 +33,39 @@ def _utc(value: datetime) -> datetime:
 
 def _tao_ket_qua(job: LuotThuThap) -> dict:
     duration = None
-    if job.EndTime is not None:
+    if job.ket_thuc_luc is not None:
         duration = round(
-            (_utc(job.EndTime) - _utc(job.StartTime)).total_seconds(),
+            (_utc(job.ket_thuc_luc) - _utc(job.bat_dau_luc)).total_seconds(),
             3,
         )
     return {
-        "job_id": str(job.RunId),
-        "started_at": job.StartTime,
-        "completed_at": job.EndTime,
-        "status": job.Status,
+        "job_id": str(job.id),
+        "started_at": job.bat_dau_luc,
+        "completed_at": job.ket_thuc_luc,
+        "status": job.trang_thai,
         "stage": None,
-        "records_processed": job.RecordsInserted + job.RecordsUpdated,
-        "records_inserted": job.RecordsInserted,
-        "records_updated": job.RecordsUpdated,
+        "records_processed": job.so_ban_ghi_them + job.so_ban_ghi_cap_nhat,
+        "records_inserted": job.so_ban_ghi_them,
+        "records_updated": job.so_ban_ghi_cap_nhat,
         "duration_seconds": duration,
-        "message": job.ErrorMessage,
-        "triggered_by": job.TriggeredBy,
+        "message": job.thong_bao_loi,
+        "triggered_by": job.nguoi_kich_hoat,
     }
 
 
 def _tao_giam_sat(db: Session) -> dict:
     last_success = (
         db.query(LuotThuThap)
-        .filter(func.upper(LuotThuThap.Status).in_(("SUCCESS", "SUCCEEDED")))
-        .order_by(LuotThuThap.StartTime.desc())
+        .filter(func.upper(LuotThuThap.trang_thai).in_(("SUCCESS", "SUCCEEDED")))
+        .order_by(LuotThuThap.bat_dau_luc.desc())
         .first()
     )
     latest_job = (
         db.query(LuotThuThap)
-        .order_by(LuotThuThap.StartTime.desc())
+        .order_by(LuotThuThap.bat_dau_luc.desc())
         .first()
     )
-    last_success_at = last_success.EndTime or last_success.StartTime if last_success else None
+    last_success_at = last_success.ket_thuc_luc or last_success.bat_dau_luc if last_success else None
     minutes_since_success = None
     if last_success_at is not None:
         minutes_since_success = max(
@@ -73,7 +73,7 @@ def _tao_giam_sat(db: Session) -> dict:
             int((datetime.now(timezone.utc) - _utc(last_success_at)).total_seconds() // 60),
         )
 
-    latest_status = latest_job.Status.upper() if latest_job else ""
+    latest_status = latest_job.trang_thai.upper() if latest_job else ""
     if latest_status in ("QUEUED", "RUNNING"):
         state = "running"
         message = "GitHub Actions đang chạy một phiên thu thập."
@@ -104,8 +104,8 @@ def _tao_giam_sat(db: Session) -> dict:
 def _doc_canh_bao_chat_luong(db: Session) -> dict:
     warnings = []
     known_region_ids = {
-        region.RegionId
-        for region in db.query(DuLieuKhuVuc.RegionId).all()
+        region.ma_vung
+        for region in db.query(DuLieuKhuVuc.ma_vung).all()
     }
     known_regions = known_region_ids.intersection(EXPECTED_REGION_IDS)
     missing_dimensions = [
@@ -131,14 +131,14 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
 
     national_latest = (
         db.query(SoLieuCarbon)
-        .filter(SoLieuCarbon.RegionId == 0)
-        .order_by(SoLieuCarbon.FromTime.desc())
+        .filter(SoLieuCarbon.ma_vung == 0)
+        .order_by(SoLieuCarbon.thoi_gian.desc())
         .first()
     )
     missing_recent_data = []
     mix_present = False
     mix_totals_valid = None
-    latest_at = national_latest.FromTime if national_latest else None
+    latest_at = national_latest.thoi_gian if national_latest else None
     if national_latest is None:
         warnings.append(
             {
@@ -149,14 +149,14 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
     else:
         region_latest = (
             db.query(
-                SoLieuCarbon.RegionId,
-                func.max(SoLieuCarbon.FromTime).label("latest_at"),
+                SoLieuCarbon.ma_vung,
+                func.max(SoLieuCarbon.thoi_gian).label("latest_at"),
             )
-            .group_by(SoLieuCarbon.RegionId)
+            .group_by(SoLieuCarbon.ma_vung)
             .all()
         )
         latest_by_region = {region_id: _utc(value) for region_id, value in region_latest}
-        national_time = _utc(national_latest.FromTime)
+        national_time = _utc(national_latest.thoi_gian)
         stale_before = national_time.timestamp() - 2 * 60 * 60
         missing_recent_data = [
             region_id
@@ -175,7 +175,7 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
 
         mix = (
             db.query(GenerationMix)
-            .filter(GenerationMix.ReadingId == national_latest.ReadingId)
+            .filter(GenerationMix.reading_id == national_latest.id)
             .first()
         )
         mix_present = mix is not None
@@ -187,9 +187,9 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
                 }
             )
         else:
-            clean = float(mix.CleanTotalPerc or 0)
-            fossil = float(mix.FossilTotalPerc or 0)
-            imports = float(mix.ImportsPerc or 0)
+            clean = float(mix.clean_total or 0)
+            fossil = float(mix.fossil_total or 0)
+            imports = float(mix.imports or 0)
             mix_totals_valid = abs(clean + fossil + imports - 100) <= 3
             if not mix_totals_valid:
                 warnings.append(
@@ -267,7 +267,7 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
 def lay_trang_thai(db: Session = Depends(lay_phien_db)):
     latest = (
         db.query(LuotThuThap)
-        .order_by(LuotThuThap.StartTime.desc())
+        .order_by(LuotThuThap.bat_dau_luc.desc())
         .first()
     )
     result = _tao_ket_qua(latest) if latest else {
@@ -294,7 +294,7 @@ def lay_lich_su(
 ):
     jobs = (
         db.query(LuotThuThap)
-        .order_by(LuotThuThap.StartTime.desc())
+        .order_by(LuotThuThap.bat_dau_luc.desc())
         .limit(min(max(limit, 1), 500))
         .all()
     )
