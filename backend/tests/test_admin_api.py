@@ -393,10 +393,19 @@ class CarbonCollectorTests(unittest.TestCase):
 
     def test_historical_collection_uses_supported_routes_and_upserts_by_period(self):
         requests = []
+        request_ranges = []
 
         def responder(request):
             path = unquote(request.url.path).strip("/").split("/")
             requests.append(request.url.path)
+            range_start_index = 2 if path[0] == "regional" else 1
+            range_start = datetime.fromisoformat(
+                path[range_start_index].replace("Z", "+00:00")
+            )
+            range_end = datetime.fromisoformat(
+                path[range_start_index + 1].replace("Z", "+00:00")
+            )
+            request_ranges.append((range_start, range_end))
             if path[0] == "regional":
                 from_time, to_time = path[2], path[3]
                 return httpx.Response(
@@ -491,6 +500,12 @@ class CarbonCollectorTests(unittest.TestCase):
             self.assertEqual(
                 len([path for path in requests if path.startswith("/regional/intensity/")]),
                 4,
+            )
+            self.assertTrue(
+                all(
+                    end - start <= timedelta(days=13)
+                    for start, end in request_ranges
+                )
             )
         finally:
             session.close()

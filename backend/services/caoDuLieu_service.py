@@ -411,7 +411,7 @@ async def thu_thap_khoang_thoi_gian(
     async with httpx.AsyncClient(timeout=30.0) as client:
         cursor = bat_dau
         while cursor < ket_thuc:
-            window_end = min(cursor + timedelta(days=14), ket_thuc)
+            window_end = min(cursor + timedelta(days=13), ket_thuc)
             start_text = cursor.strftime("%Y-%m-%dT%H:%MZ")
             end_text = window_end.strftime("%Y-%m-%dT%H:%MZ")
             intensity_result, generation_result, regional_result = await asyncio.gather(
