@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { layTongQuanPhanCum, thongDiepLoiApi } from "../../api/axiosClient";
 
+const DEFAULT_VISIBLE_ROWS = 15;
+
 function moTaGocNhin(clusterId, name = "") {
   const lower = name.toLowerCase();
   if (lower.includes("thấp") || clusterId === 2) {
@@ -9,7 +11,40 @@ function moTaGocNhin(clusterId, name = "") {
   if (lower.includes("cao") || clusterId === 0) {
     return "Mức carbon cao — hạn chế dồn tải lớn nếu có thể";
   }
-  return "Dao động mạnh trong ngày — cần theo dõi khung giờ";
+  return "Biến động cao trong ngày — cần theo dõi khung giờ";
+}
+
+function pastelCardStyle(clusterId, color = "#07866c", isSelected = false) {
+  let bg = "#f8fafc";
+  let accent = color || "#07866c";
+
+  if (clusterId === 0) {
+    bg = "#fff1f2";
+    accent = color || "#e11d48";
+  } else if (clusterId === 1) {
+    bg = "#fffbeb";
+    accent = color || "#d97706";
+  } else if (clusterId === 2) {
+    bg = "#ecfdf5";
+    accent = color || "#059669";
+  }
+
+  return {
+    accent,
+    style: {
+      textAlign: "left",
+      padding: "14px 16px",
+      borderRadius: "12px",
+      background: bg,
+      border: isSelected ? `2px solid ${accent}` : "1px solid transparent",
+      boxShadow: isSelected ? "0 2px 8px rgba(15, 23, 42, 0.06)" : "none",
+      display: "flex",
+      flexDirection: "column",
+      gap: 5,
+      cursor: "pointer",
+      transition: "all 0.15s ease",
+    },
+  };
 }
 
 export default function BieuDoPhanCumKMeans() {
@@ -20,6 +55,7 @@ export default function BieuDoPhanCumKMeans() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [hoveredDay, setHoveredDay] = useState(null);
+  const [showAllRows, setShowAllRows] = useState(false);
 
   const tableAreaRef = useRef(null);
 
@@ -33,6 +69,7 @@ export default function BieuDoPhanCumKMeans() {
 
       const res = await layTongQuanPhanCum(params);
       setData(res);
+      setShowAllRows(false);
     } catch (err) {
       setError(thongDiepLoiApi(err));
     } finally {
@@ -54,11 +91,13 @@ export default function BieuDoPhanCumKMeans() {
     setStartDate("");
     setEndDate("");
     setHoveredDay(null);
+    setShowAllRows(false);
     taiDuLieu({});
   }
 
   function handleChonCum(targetTab, cuonXuongTab = false) {
     setActiveTab(String(targetTab));
+    setShowAllRows(false);
     if (cuonXuongTab && tableAreaRef.current) {
       tableAreaRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
@@ -75,12 +114,6 @@ export default function BieuDoPhanCumKMeans() {
     return map;
   }, [clusters]);
 
-  const totalDaysAllClusters = useMemo(
-    () => clusters.reduce((sum, item) => sum + Number(item.DayCount || 0), 0),
-    [clusters]
-  );
-
-  // Danh sách ngày hiển thị theo tab đang chọn ("all" | "0" | "1" | "2")
   const filteredDailyClusters = useMemo(() => {
     if (activeTab === "all") return allDailyClusters;
     return allDailyClusters.filter(
@@ -88,7 +121,11 @@ export default function BieuDoPhanCumKMeans() {
     );
   }, [allDailyClusters, activeTab]);
 
-  // Tính miền giá trị trục X (StdIntensity) và trục Y (MeanIntensity)
+  const visibleDailyClusters = useMemo(() => {
+    if (showAllRows) return filteredDailyClusters;
+    return filteredDailyClusters.slice(0, DEFAULT_VISIBLE_ROWS);
+  }, [filteredDailyClusters, showAllRows]);
+
   const chartBounds = useMemo(() => {
     const stdValues = [
       ...allDailyClusters.map((d) => Number(d.StdIntensity)),
@@ -215,8 +252,8 @@ export default function BieuDoPhanCumKMeans() {
                 lineHeight: 1.5,
               }}
             >
-              Mỗi chấm là 1 ngày đủ 48 mốc 30 phút. Nhìn vào sơ đồ để thấy ngay
-              các nhóm ngày, hoặc bấm vào cụm/chấm để chuyển sang tab tương ứng.
+              Mỗi chấm là một ngày (48 mốc 30 phút). Bấm vào cụm hoặc chấm để
+              lọc danh sách bên dưới.
             </p>
           </div>
 
@@ -292,7 +329,7 @@ export default function BieuDoPhanCumKMeans() {
           </button>
         </form>
 
-        {/* Chú thích 3 vùng / 3 cụm dễ hiểu */}
+        {/* 3 thẻ cụm màu pastel khớp đúng màu cụm */}
         <div
           style={{
             display: "grid",
@@ -302,67 +339,40 @@ export default function BieuDoPhanCumKMeans() {
           }}
         >
           {clusters.map((c) => {
-            const pct =
-              totalDaysAllClusters > 0
-                ? ((Number(c.DayCount || 0) / totalDaysAllClusters) * 100).toFixed(
-                    1
-                  )
-                : "0.0";
+            const cId = Number(c.ClusterId);
             const isSelected = activeTab === String(c.ClusterId);
-            const color = c.ColorHex || "#07866c";
+            const { accent, style } = pastelCardStyle(cId, c.ColorHex, isSelected);
 
             return (
               <button
                 key={c.ClusterRecordId}
                 type="button"
                 onClick={() => handleChonCum(c.ClusterId, true)}
-                style={{
-                  textAlign: "left",
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  background: isSelected ? "#f3faf7" : "#fafcfb",
-                  border: isSelected
-                    ? `2px solid ${color}`
-                    : "1px solid #e6ece9",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 4,
-                }}
+                style={style}
               >
-                <div
+                <span
                   style={{
-                    display: "flex",
+                    display: "inline-flex",
                     alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 8,
+                    gap: 7,
+                    fontWeight: 700,
+                    fontSize: 13.5,
+                    color: "#17241f",
                   }}
                 >
                   <span
                     style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: "#17241f",
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      background: accent,
+                      flexShrink: 0,
                     }}
-                  >
-                    <span
-                      style={{
-                        width: 11,
-                        height: 11,
-                        borderRadius: "50%",
-                        background: color,
-                      }}
-                    />
-                    Cụm {c.ClusterId}: {c.ClusterName}
-                  </span>
-                  <span style={{ fontSize: 12, fontWeight: 650, color }}>
-                    {c.DayCount} ngày ({pct}%)
-                  </span>
-                </div>
-                <span style={{ fontSize: 12, color: "#5b6862", lineHeight: 1.4 }}>
-                  {moTaGocNhin(c.ClusterId, c.ClusterName)}
+                  />
+                  Cụm {c.ClusterId}: {c.ClusterName}
+                </span>
+                <span style={{ fontSize: 12.5, color: "#475569", lineHeight: 1.45 }}>
+                  {moTaGocNhin(cId, c.ClusterName)}
                 </span>
               </button>
             );
@@ -397,14 +407,12 @@ export default function BieuDoPhanCumKMeans() {
               </span>
               <span>
                 Mean: <strong>{hoveredDay.MeanIntensity}</strong> · Std:{" "}
-                <strong>{hoveredDay.StdIntensity}</strong> · Bấm để mở tab Cụm{" "}
-                {hoveredDay.ClusterId}
+                <strong>{hoveredDay.StdIntensity}</strong>
               </span>
             </>
           ) : (
             <span style={{ color: "#5f6c66" }}>
-              Rê chuột vào từng chấm để xem thông số ngày, hoặc bấm chấm để xem
-              tab cụm tương ứng phía dưới.
+              Rê chuột vào chấm để xem chi tiết ngày.
             </span>
           )}
         </div>
@@ -482,7 +490,7 @@ export default function BieuDoPhanCumKMeans() {
               fontWeight="600"
               fill="#293731"
             >
-              Std Intensity (độ dao động trong ngày — càng sang trái càng ổn định)
+              Std Intensity (độ dao động)
             </text>
             <text
               x={16}
@@ -566,7 +574,7 @@ export default function BieuDoPhanCumKMeans() {
         </div>
       </div>
 
-      {/* Khối 2: 4 tab (Tất cả, Cụm 0, Cụm 1, Cụm 2) + bảng tương ứng */}
+      {/* Khối 2: 4 tab (Tất cả, Cụm 0, Cụm 1, Cụm 2) + bảng gọn mặc định 15 dòng */}
       <div ref={tableAreaRef} className="card history-card">
         <div
           style={{
@@ -584,8 +592,8 @@ export default function BieuDoPhanCumKMeans() {
               Danh sách ngày theo từng nhóm
             </h2>
             <p style={{ margin: "4px 0 0", fontSize: 13, color: "#68756f" }}>
-              Đang hiển thị <strong>{filteredDailyClusters.length}</strong> ngày
-              hợp lệ (đủ 48 mốc 30 phút/ngày)
+              Hiển thị <strong>{visibleDailyClusters.length}</strong> /{" "}
+              <strong>{filteredDailyClusters.length}</strong> ngày
             </p>
           </div>
 
@@ -649,8 +657,8 @@ export default function BieuDoPhanCumKMeans() {
               </tr>
             </thead>
             <tbody>
-              {filteredDailyClusters.length ? (
-                filteredDailyClusters.map((row) => {
+              {visibleDailyClusters.length ? (
+                visibleDailyClusters.map((row) => {
                   const cInfo = clusterMap.get(Number(row.ClusterId));
                   return (
                     <tr key={row.DailyClusterId}>
@@ -700,6 +708,28 @@ export default function BieuDoPhanCumKMeans() {
             </tbody>
           </table>
         </div>
+
+        {filteredDailyClusters.length > DEFAULT_VISIBLE_ROWS && (
+          <div
+            style={{
+              padding: "12px 20px 16px",
+              borderTop: "1px solid #eef2f0",
+              display: "flex",
+              justifyContent: "center",
+            }}
+          >
+            <button
+              type="button"
+              className="button button-secondary"
+              style={{ height: 36, padding: "0 16px", fontSize: 13 }}
+              onClick={() => setShowAllRows((prev) => !prev)}
+            >
+              {showAllRows
+                ? `Rút gọn`
+                : `Hiển thị tất cả`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

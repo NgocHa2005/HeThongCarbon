@@ -1,5 +1,6 @@
 import React from "react";
 import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans";
+import BieuDoDuBaoNgayMai from "../thanhPhan/khaiPha/BieuDoDuBaoNgayMai";
 
 export default function TrangDashboardCongKhai() {
   return (
@@ -19,6 +20,7 @@ export default function TrangDashboardCongKhai() {
       </div>
 
       <BieuDoPhanCumKMeans />
+      <BieuDoDuBaoNgayMai />
     </div>
   );
 }
