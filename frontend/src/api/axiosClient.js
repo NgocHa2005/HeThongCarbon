@@ -58,3 +58,30 @@ export async function layDuBaoNgayMai(params = {}) {
   });
   return data;
 }
+
+
+export async function layBienDong(kieu = "ngay") {
+  const { data } = await client.get("/api/v1/analysis/fluctuation", {
+    params: { kieu },
+  });
+  return data;
+}
+
+export async function layPhanBo(kieu = "ngay") {
+  const { data } = await client.get("/api/v1/analysis/scatter", {
+    params: { kieu },
+  });
+  return data;
+}
+
+export async function layTanSuat(kieu = "ngay") {
+  const { data } = await client.get("/api/v1/analysis/histogram", {
+    params: { kieu },
+  });
+  return data;
+}
+
+export async function layDashboardPhanTich() {
+  const { data } = await client.get("/api/v1/analysis/dashboard");
+  return data;
+}

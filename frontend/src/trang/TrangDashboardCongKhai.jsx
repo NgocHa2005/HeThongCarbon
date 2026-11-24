@@ -2,6 +2,11 @@ import React from "react";
 import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans";
 import BieuDoDuBaoNgayMai from "../thanhPhan/khaiPha/BieuDoDuBaoNgayMai";
 
+import TheChiSoThoiGianThuc from "../thanhPhan/trangChu/TheChiSoThoiGianThuc";
+import BieuDoChuoiThoiGian from "../thanhPhan/trangChu/BieuDoChuoiThoiGian";
+import BieuDoBocTach from "../thanhPhan/trangChu/BieuDoBocTach";
+import BieuDoTanSuat from "../thanhPhan/trangChu/BieuDoTanSuat";
+
 export default function TrangDashboardCongKhai() {
   return (
     <div className="page-content">
@@ -11,14 +16,18 @@ export default function TrangDashboardCongKhai() {
             <span className="eyebrow-line" />
             KHAI PHÁ DỮ LIỆU CARBON
           </div>
-          <h1>Phân cụm cường độ carbon theo ngày</h1>
+          <h1>Phân tích cường độ carbon</h1>
           <p>
-            Tổng hợp đặc trưng trung bình và độ biến động trong ngày của lưới
-            điện GB (Region 0) bằng thuật toán K-Means.
+            Theo dõi biến động, phân bố, tần suất và dự báo cường độ carbon
+            của lưới điện Great Britain (GB).
           </p>
         </div>
       </div>
 
+      <TheChiSoThoiGianThuc />
+      <BieuDoChuoiThoiGian />
+      <BieuDoBocTach />
+      <BieuDoTanSuat />
       <BieuDoPhanCumKMeans />
       <BieuDoDuBaoNgayMai />
     </div>

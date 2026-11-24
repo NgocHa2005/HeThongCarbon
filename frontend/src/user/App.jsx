@@ -6,8 +6,9 @@ import {
   layLichSuCarbon,
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
-import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans.jsx";
-import BieuDoDuBaoNgayMai from "../thanhPhan/khaiPha/BieuDoDuBaoNgayMai.jsx";
+
+import TrangDashboardCongKhai from "../trang/TrangDashboardCongKhai.jsx";
+
 import "./user.css";
 
 function dinhDangSo(value, digits = 0) {
@@ -158,10 +159,7 @@ function UserApp() {
         </article>
       </section>
 
-      <section style={{ marginTop: 22 }}>
-        <BieuDoPhanCumKMeans />
-        <BieuDoDuBaoNgayMai />
-      </section>
+      <TrangDashboardCongKhai />
 
       <footer className="public-footer">
         <span><Leaf size={14} /> Nguồn dữ liệu: Carbon Intensity API, Great Britain</span>

@@ -8,6 +8,8 @@ from routers.congKhai_router import router as public_router
 from routers.phanTich_router import router as analysis_router
 from routers.quanTri_router import router as admin_router
 
+from routers.moTa_router import router as description_router
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -30,7 +32,7 @@ app.add_middleware(
 app.include_router(admin_router)
 app.include_router(public_router)
 app.include_router(analysis_router)
-
+app.include_router(description_router)
 
 @app.get("/health", tags=["Hệ thống"])
 def health_check():

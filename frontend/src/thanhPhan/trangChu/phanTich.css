@@ -1,0 +1,214 @@
+.the-chi-so {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 15px;
+  margin: 20px 0;
+}
+
+.the-chi-so-chinh,
+.the-chi-so-thong-ke > div {
+  padding: 20px;
+  border: 1px solid #e9eeec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.the-chi-so-tieu-de {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #07866c;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.the-chi-so-gia-tri {
+  margin: 18px 0 10px;
+  color: #17241f;
+  font-size: 32px;
+  font-weight: 750;
+}
+
+.the-chi-so-gia-tri span {
+  color: #77837e;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.the-chi-so-chinh p {
+  margin: 8px 0;
+  color: #77837e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.the-chi-so-thong-ke {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.the-chi-so-thong-ke > div {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.the-chi-so-thong-ke span {
+  color: #919c96;
+  font-size: 12px;
+}
+
+.the-chi-so-thong-ke strong {
+  color: #293731;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.bieu-do-thoi-gian,
+.bieu-do-phan-bo,
+.bieu-do-tan-suat {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #e9eeec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bieu-do-tieu-de {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.bieu-do-tieu-de h2 {
+  margin: 0;
+  color: #293731;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.bieu-do-tieu-de p {
+  margin: 5px 0 0;
+  color: #77837e;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bieu-do-khung {
+  width: 100%;
+  min-width: 0;
+  height: 320px;
+}
+
+.xu-huong,
+.bieu-do-thong-tin {
+  margin: 10px 0;
+  color: #77837e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bieu-do-tieu-de select {
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #e9eeec;
+  border-radius: 6px;
+  background: #fff;
+  color: #293731;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.bieu-do-dieu-khien {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.bieu-do-dieu-khien button {
+  min-width: 36px;
+  padding: 7px 12px;
+  border: 1px solid #e9eeec;
+  border-radius: 6px;
+  background: #fff;
+  color: #07866c;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.bieu-do-dieu-khien button:hover:not(:disabled) {
+  background: #f0f8f5;
+}
+
+.bieu-do-dieu-khien button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bieu-do-dieu-khien span {
+  color: #919c96;
+  font-size: 12px;
+}
+
+.bieu-do-trang-thai {
+  margin: 12px 0;
+  color: #77837e;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bieu-do-dieu-khien button:focus-visible,
+.bieu-do-tieu-de select:focus-visible {
+  outline: 2px solid #07866c;
+  outline-offset: 2px;
+}
+
+
+@media (max-width: 700px) {
+  .the-chi-so {
+    grid-template-columns: 1fr;
+  }
+
+  .bieu-do-thoi-gian,
+  .bieu-do-phan-bo,
+  .bieu-do-tan-suat {
+    padding: 14px;
+  }
+
+  .bieu-do-khung {
+    height: 260px;
+  }
+
+  .bieu-do-tieu-de h2 {
+    font-size: 15px;
+  }
+
+  .the-chi-so-gia-tri {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 400px) {
+  .the-chi-so-thong-ke {
+    grid-template-columns: 1fr;
+  }
+
+  .bieu-do-khung {
+    height: 240px;
+  }
+
+  .bieu-do-tieu-de {
+    align-items: flex-start;
+  }
+}
