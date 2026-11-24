@@ -1,13 +1,11 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from config.database import Base, engine
 from config.settings import CORS_ORIGINS
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers.congKhai_router import router as public_router
 from routers.quanTri_router import router as admin_router
-import models
 
 
 @asynccontextmanager
