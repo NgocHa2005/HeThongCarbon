@@ -110,4 +110,8 @@ Git tự tạo thư mục `HeThongCarbon`; không cần tạo thư mục trướ
 ```powershell
 git clone https://github.com/NgocHa2005/HeThongCarbon.git HeThongCarbon
 Set-Location HeThongCarbon
+
+
+.venv\Scripts\Activate.ps1
+
 ```
