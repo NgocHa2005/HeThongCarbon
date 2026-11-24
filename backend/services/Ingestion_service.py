@@ -1,12 +1,13 @@
 import asyncio
 from datetime import datetime, timezone
 
-from backend.config.database import SessionLocal
+from config.database import SessionLocal
+from models import SysIngestionRun
+
 from backend.services.caoDuLieu_service import (
     thu_thap_du_lieu,
     thu_thap_khoang_thoi_gian,
 )
-from models import SysIngestionRun
 
 
 def tao_luot_thu_thap(nguoi_kich_hoat: str) -> int:
@@ -43,6 +44,7 @@ def thuc_hien_luot_thu_thap(
         if mode == "collect":
             result = asyncio.run(thu_thap_du_lieu(db))
         elif mode == "backfill" and bat_dau is not None and ket_thuc is not None:
+
             def cap_nhat_so_lieu(partial_result):
                 current_job = db.get(SysIngestionRun, run_id)
                 if current_job is not None:
