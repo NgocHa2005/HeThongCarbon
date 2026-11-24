@@ -113,5 +113,9 @@ Set-Location HeThongCarbon
 
 
 .venv\Scripts\Activate.ps1
+uvicorn main:app --reload
+npm run dev
+
+$env:VITE_API_URL="http://localhost:8001"; npm run dev
 
 ```

@@ -1,10 +1,10 @@
+from config.database import lay_phien_db
+from config.settings import GLOBAL_REGION_ID
 from fastapi import APIRouter, Depends, HTTPException
-from models import DuLieuKhuVuc, SoLieuCarbon
+from models import DimRegion as DuLieuKhuVuc
+from models import FactCarbonReading as SoLieuCarbon
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
-
-from backend.config.database import lay_phien_db
-from backend.config.settings import GLOBAL_REGION_ID
 
 router = APIRouter(prefix="/api/v1", tags=["Dữ liệu công khai"])
 

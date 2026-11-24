@@ -1,5 +1,6 @@
+// frontend/src/user/App.jsx
 import { useCallback, useEffect, useState } from "react";
-import { Activity, ArrowUpRight, Leaf, RefreshCw, Zap } from "lucide-react";
+import { Activity, ArrowUpRight, Leaf, MapPin, RefreshCw, Zap } from "lucide-react";
 import {
   layCarbonMoiNhat,
   layDuLieuKhuVuc,
@@ -7,6 +8,11 @@ import {
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
 import "./user.css";
+
+// 3 trang chức năng public
+import TrangTongQuanLuoiDien from "../trang/TrangTongQuanLuoiDien";
+import TrangDuBao_SacXeDien from "../trang/TrangDuBao_SacXeDien";
+import TrangTraCuu_SoSanhKhuVucDNO from "../trang/TrangTraCuu_SoSanhKhuVucDNO";
 
 function dinhDangSo(value, digits = 0) {
   if (value === undefined || value === null) return "—";
@@ -31,6 +37,9 @@ function UserApp() {
   const [regions, setRegions] = useState([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // State điều hướng các màn hình user
+  const [tabHienTai, setTabHienTai] = useState("tong-quan");
 
   const refresh = useCallback(async () => {
     try {
@@ -66,30 +75,68 @@ function UserApp() {
     ["Hạt nhân", snapshot?.hat_nhan, "%", "purple"],
   ];
 
+  const danhSachTabUser = [
+    { id: "tong-quan", label: "Tổng quan lưới điện", icon: Activity },
+    { id: "du-bao-ev", label: "Dự báo & Sạc EV", icon: Zap },
+    { id: "khu-vuc-dno", label: "So sánh 14 vùng DNO", icon: MapPin },
+  ];
+
   return (
     <main className="public-page">
       <header className="public-header">
         <a className="public-brand" href="/" aria-label="CarbonScope trang chủ">
-          <span className="public-brand-mark"><Leaf size={19} /></span>
-          <span>Carbon<span>Scope</span></span>
+          <span className="public-brand-mark">
+            <Leaf size={19} />
+          </span>
+          <span>
+            Carbon<span>Scope</span>
+          </span>
         </a>
+
+        {/* Thanh điều hướng 3 chức năng người dùng */}
+        <nav aria-label="Chức năng người dùng" className="flex flex-wrap items-center gap-2">
+          {danhSachTabUser.map((tab) => {
+            const IconComponent = tab.icon;
+            const isActive = tabHienTai === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setTabHienTai(tab.id)}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+                  isActive
+                    ? "bg-emerald-700 text-white font-bold shadow-xs"
+                    : "bg-slate-100 text-slate-700 font-medium hover:bg-slate-200"
+                }`}
+              >
+                <IconComponent size={16} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+
         <div className="public-header-actions">
-          <span className="live-label"><span /> DỮ LIỆU CẬP NHẬT</span>
+          <span className="live-label">
+            <span /> DỮ LIỆU CẬP NHẬT
+          </span>
           <button className="refresh-button" onClick={refresh} aria-label="Làm mới dữ liệu">
             <RefreshCw size={16} /> Làm mới
           </button>
-          <a className="admin-link" href="/admin">Quản trị <ArrowUpRight size={15} /></a>
+          <a className="admin-link" href="/admin">
+            Quản trị <ArrowUpRight size={15} />
+          </a>
         </div>
       </header>
 
-      <section className="public-hero">
+      {/* <section className="public-hero">
         <div>
           <p className="public-eyebrow">CARBON INTENSITY · GREAT BRITAIN</p>
           <h1>Theo dõi cường độ carbon</h1>
           <p className="public-intro">Dữ liệu phát thải điện năng và cơ cấu nguồn điện mới nhất.</p>
         </div>
         <div className="updated-at"><Activity size={15} /> Cập nhật: {dinhDangThoiGian(snapshot?.thoi_gian)}</div>
-      </section>
+      </section> */}
 
       {error && (
         <div className="public-error" role="alert">
@@ -98,7 +145,7 @@ function UserApp() {
         </div>
       )}
 
-      <section className="public-overview">
+      {/* <section className="public-overview">
         <article className="intensity-card">
           <div className="metric-label"><Zap size={17} /> CƯỜNG ĐỘ CARBON</div>
           <div className="intensity-value">{isLoading ? "…" : dinhDangSo(snapshot?.cuong_do)}</div>
@@ -154,11 +201,30 @@ function UserApp() {
             )) : <div className="public-empty">{isLoading ? "Đang tải dữ liệu…" : "Chưa có dữ liệu vùng."}</div>}
           </div>
         </article>
+      </section> */}
+
+      {/* Nội dung 3 chức năng người dùng */}
+      <section className="mt-5 mb-6">
+        {tabHienTai === "tong-quan" && (
+          <TrangTongQuanLuoiDien
+            snapshot={snapshot}
+            history={history}
+            isLoading={isLoading}
+          />
+        )}
+        {tabHienTai === "du-bao-ev" && <TrangDuBao_SacXeDien />}
+        {tabHienTai === "khu-vuc-dno" && (
+          <TrangTraCuu_SoSanhKhuVucDNO regionsApi={regions} />
+        )}
       </section>
 
       <footer className="public-footer">
-        <span><Leaf size={14} /> Nguồn dữ liệu: Carbon Intensity API, Great Britain</span>
-        <span><Zap size={14} /> <span className="footer-live-dot" /> Cập nhật tự động mỗi 30 giây</span>
+        <span>
+          <Leaf size={14} /> Nguồn dữ liệu: Carbon Intensity API, Great Britain
+        </span>
+        <span>
+          <Zap size={14} /> <span className="footer-live-dot" /> Cập nhật tự động mỗi 30 giây
+        </span>
       </footer>
     </main>
   );

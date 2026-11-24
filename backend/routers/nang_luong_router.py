@@ -1,15 +1,15 @@
 from typing import Annotated
 
-from config.database import get_db
+from config.database import lay_phien_db
 from fastapi import APIRouter, Depends, Query
 from schemas.nang_luong_schema import CorrelationHeatmapResponse, GenerationMixResponse
 from services.nang_luong_service import NangLuongService
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api/energy", tags=["Energy & Correlation"])
+router = APIRouter(prefix="/api/energy", tags=["Cơ Cấu Năng Lượng Và Sơ Đồ Tương Quan"])
 
 # Định nghĩa kiểu dữ liệu tiêm phụ thuộc dùng chung cho toàn bộ router
-DbSession = Annotated[Session, Depends(get_db)]
+DbSession = Annotated[Session, Depends(lay_phien_db)]
 
 
 @router.get(

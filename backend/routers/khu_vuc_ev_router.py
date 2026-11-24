@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from config.database import get_db
+from config.database import lay_phien_db
 from fastapi import APIRouter, Depends, Path, Query
 from schemas.khu_vuc_ev_schema import (
     EvRecommendationResponse,
@@ -11,9 +11,9 @@ from schemas.khu_vuc_ev_schema import (
 from services.khu_vuc_ev_service import KhuVucEvService
 from sqlalchemy.orm import Session
 
-router = APIRouter(prefix="/api", tags=["Regional & EV Charging"])
+router = APIRouter(prefix="/api", tags=["Khu Vực Và Gợi Ý Sạc Xe"])
 
-DbSession = Annotated[Session, Depends(get_db)]
+DbSession = Annotated[Session, Depends(lay_phien_db)]
 
 
 @router.get(
