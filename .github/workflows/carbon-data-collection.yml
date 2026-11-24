@@ -49,6 +49,7 @@ jobs:
       - name: Run ingestion
         working-directory: backend
         env:
+          PYTHONPATH: ${{ github.workspace }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           CARBON_API_BASE_URL: https://api.carbonintensity.org.uk
           CARBON_ALERT_THRESHOLD: ${{ vars.CARBON_ALERT_THRESHOLD || '250' }}
@@ -65,14 +66,14 @@ jobs:
           fi
 
           if [ "$EVENT_NAME" = "schedule" ]; then
-            python -m dichVu.ingestion_cli --mode collect --source schedule
+            python -m services.ingestion_cli --mode collect --source schedule
           elif [ "$MODE" = "backfill" ]; then
             if [ -z "$START_DATE" ] || [ -z "$END_DATE" ]; then
               echo "::error::Backfill requires start_date and end_date."
               exit 1
             fi
-            python -m dichVu.ingestion_cli --mode backfill --source dispatch \
+            python -m services.ingestion_cli --mode backfill --source dispatch \
               --start-date "$START_DATE" --end-date "$END_DATE"
           else
-            python -m dichVu.ingestion_cli --mode collect --source dispatch
+            python -m services.ingestion_cli --mode collect --source dispatch
           fi
