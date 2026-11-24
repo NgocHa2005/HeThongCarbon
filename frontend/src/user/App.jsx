@@ -6,6 +6,7 @@ import {
   layLichSuCarbon,
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
+import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans.jsx";
 import "./user.css";
 
 function dinhDangSo(value, digits = 0) {
@@ -154,6 +155,10 @@ function UserApp() {
             )) : <div className="public-empty">{isLoading ? "Đang tải dữ liệu…" : "Chưa có dữ liệu vùng."}</div>}
           </div>
         </article>
+      </section>
+
+      <section style={{ marginTop: 22 }}>
+        <BieuDoPhanCumKMeans />
       </section>
 
       <footer className="public-footer">
