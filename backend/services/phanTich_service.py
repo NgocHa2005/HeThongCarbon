@@ -21,6 +21,7 @@ def dashboard(db: Session):
     # Lấy bản ghi mới nhất
     hien_tai = (
         lay_du_lieu(db)
+        .filter(FactCarbonReading.FromTime <= datetime.now(timezone.utc))
         .order_by(FactCarbonReading.FromTime.desc())
         .first()
     )
@@ -54,6 +55,8 @@ def dashboard(db: Session):
 
     return {
         "hien_tai": {
+            "den_thoi_diem": hien_tai.ToTime,
+            "cap_nhat_luc": hien_tai.IngestedAt,
             "thoi_gian": hien_tai.FromTime,
             "cuong_do": (
                 hien_tai.IntensityActual
@@ -73,6 +76,10 @@ def dashboard(db: Session):
             if gia_tri else None,
             "cao_nhat": max(gia_tri) if gia_tri else None,
             "thap_nhat": min(gia_tri) if gia_tri else None,
+            "chuoi": [
+                {"thoi_gian": r.FromTime, "thuc_te": r.IntensityActual, "du_bao": r.IntensityForecast}
+                for r in du_lieu_hom_nay
+            ],
         },
     }
 

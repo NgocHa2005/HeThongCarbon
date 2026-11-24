@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, ArrowUpRight, Leaf, RefreshCw, Zap } from "lucide-react";
+import { Activity, Leaf, Zap } from "lucide-react";
 import {
   layCarbonMoiNhat,
   layDuLieuKhuVuc,
@@ -69,31 +69,8 @@ function UserApp() {
     ["Hạt nhân", snapshot?.hat_nhan, "%", "purple"],
   ];
 
-  return (
-    <main className="public-page">
-      <header className="public-header">
-        <a className="public-brand" href="/" aria-label="CarbonScope trang chủ">
-          <span className="public-brand-mark"><Leaf size={19} /></span>
-          <span>Carbon<span>Scope</span></span>
-        </a>
-        <div className="public-header-actions">
-          <span className="live-label"><span /> DỮ LIỆU CẬP NHẬT</span>
-          <button className="refresh-button" onClick={refresh} aria-label="Làm mới dữ liệu">
-            <RefreshCw size={16} /> Làm mới
-          </button>
-          <a className="admin-link" href="/admin">Quản trị <ArrowUpRight size={15} /></a>
-        </div>
-      </header>
-
-      <section className="public-hero">
-        <div>
-          <p className="public-eyebrow">CARBON INTENSITY · GREAT BRITAIN</p>
-          <h1>Theo dõi cường độ carbon</h1>
-          <p className="public-intro">Dữ liệu phát thải điện năng và cơ cấu nguồn điện mới nhất.</p>
-        </div>
-        <div className="updated-at"><Activity size={15} /> Cập nhật: {dinhDangThoiGian(snapshot?.thoi_gian)}</div>
-      </section>
-
+  const trangNguonDien = (
+    <div className="public-page-trong">
       {error && (
         <div className="public-error" role="alert">
           <strong>Không thể tải dữ liệu mới nhất.</strong> {error}
@@ -101,16 +78,7 @@ function UserApp() {
         </div>
       )}
 
-      <section className="public-overview">
-        <article className="intensity-card">
-          <div className="metric-label"><Zap size={17} /> CƯỜNG ĐỘ CARBON</div>
-          <div className="intensity-value">{isLoading ? "…" : dinhDangSo(snapshot?.cuong_do)}</div>
-          <div className="intensity-unit">gCO₂/kWh</div>
-          <div className="intensity-status">
-            <span className="intensity-dot" />
-            {snapshot?.muc_do || (snapshot ? "Chưa phân loại" : "Chưa có dữ liệu")}
-          </div>
-        </article>
+      <section className="public-overview" style={{ gridTemplateColumns: "1fr" }}>
         <div className="fuel-grid">
           {fuelMetrics.map(([label, value, unit, color]) => (
             <article className="fuel-card" key={label}>
@@ -159,14 +127,14 @@ function UserApp() {
         </article>
       </section>
 
-      <TrangDashboardCongKhai />
-
       <footer className="public-footer">
         <span><Leaf size={14} /> Nguồn dữ liệu: Carbon Intensity API, Great Britain</span>
         <span><Zap size={14} /> <span className="footer-live-dot" /> Cập nhật tự động mỗi 30 giây</span>
       </footer>
-    </main>
+    </div>
   );
+
+  return <TrangDashboardCongKhai trangNguonDien={trangNguonDien} />;
 }
 
 export default UserApp;
