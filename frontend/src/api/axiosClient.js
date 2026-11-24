@@ -51,3 +51,10 @@ export async function layTongQuanPhanCum(params = {}) {
   });
   return data;
 }
+
+export async function layDuBaoNgayMai(params = {}) {
+  const { data } = await client.get("/phan-tich/du-bao/ngay-mai", {
+    params,
+  });
+  return data;
+}
