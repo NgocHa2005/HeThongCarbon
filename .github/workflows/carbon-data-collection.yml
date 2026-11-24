@@ -2,7 +2,7 @@ name: Carbon data collection
 
 on:
   schedule:
-    - cron: "7,37 * * * *"
+    - cron: "0,30 * * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -28,7 +28,6 @@ permissions:
 concurrency:
   group: carbon-data-collection
   cancel-in-progress: false
-
 jobs:
   collect:
     runs-on: ubuntu-latest
@@ -65,14 +64,14 @@ jobs:
           fi
 
           if [ "$EVENT_NAME" = "schedule" ]; then
-            python -m dichVu.ingestion_cli --mode collect --source schedule
+            python -m services.ingestion_cli --mode collect --source schedule
           elif [ "$MODE" = "backfill" ]; then
             if [ -z "$START_DATE" ] || [ -z "$END_DATE" ]; then
               echo "::error::Backfill requires start_date and end_date."
               exit 1
             fi
-            python -m dichVu.ingestion_cli --mode backfill --source dispatch \
+            python -m services.ingestion_cli --mode backfill --source dispatch \
               --start-date "$START_DATE" --end-date "$END_DATE"
           else
-            python -m dichVu.ingestion_cli --mode collect --source dispatch
+            python -m services.ingestion_cli --mode collect --source dispatch
           fi
