@@ -8,13 +8,24 @@ from models.sys_carbon_alert import SysCarbonAlert
 from models.sys_clustering_run import SysClusteringRun
 from models.sys_ingestion_run import SysIngestionRun
 
+# Keep the previous model names available while services migrate to the
+# canonical schema model names.
+DuLieuKhuVuc = DimRegion
+GenerationMix = FactGenerationMix
+SoLieuCarbon = FactCarbonReading
+LuotThuThap = SysIngestionRun
+
 __all__ = [
     "DimKmeansCluster",
     "DimRegion",
+    "DuLieuKhuVuc",
     "FactCarbonReading",
     "FactDailyCluster",
+    "GenerationMix",
     "FactGenerationMix",
     "FactMlPrediction",
+    "LuotThuThap",
+    "SoLieuCarbon",
     "SysCarbonAlert",
     "SysClusteringRun",
     "SysIngestionRun",

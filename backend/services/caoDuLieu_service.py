@@ -336,7 +336,7 @@ async def thu_thap_du_lieu(
         )
         .one()
     )
-    from services.dichVuCanhBao import kiem_tra_canh_bao_cuong_do
+    from backend.services.canhBao_service import kiem_tra_canh_bao_cuong_do
 
     kiem_tra_canh_bao_cuong_do(db, national_reading)
 
