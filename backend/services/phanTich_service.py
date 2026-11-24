@@ -1,6 +1,7 @@
-
+import time
 from datetime import datetime, timezone
 
+import pandas as pd
 from sqlalchemy.orm import Session
 
 from config.settings import GLOBAL_REGION_ID
@@ -337,3 +338,119 @@ def tan_suat(db: Session, kieu: str):
         "tong_so": len(rows)
     }
 
+
+CHU_KY_STL = {"thang": 12, "tuan": 52}  # period của STL = một năm
+DON_VI_KY = {"thang": "tháng", "tuan": "tuần"}
+TY_LE_TOI_THIEU = 0.8  # ít nhất 80% số kỳ phải có số liệu thật, phần còn lại mới được nội suy
+
+
+def _doc_chuoi_thuc_te(db: Session) -> pd.Series:
+    """Toàn bộ IntensityActual (bỏ NULL) của cả GB, chỉ số là thời gian UTC."""
+    hang = (
+        lay_du_lieu(db)
+        .filter(FactCarbonReading.IntensityActual.isnot(None))
+        .with_entities(FactCarbonReading.FromTime, FactCarbonReading.IntensityActual)
+        .order_by(FactCarbonReading.FromTime.asc())
+        .all()
+    )
+    if not hang:
+        return pd.Series(dtype=float)
+    thoi_gian = pd.to_datetime([h[0] for h in hang], utc=True)
+    return pd.Series([float(h[1]) for h in hang], index=thoi_gian)
+
+
+def _gom_trung_vi(chuoi: pd.Series, kieu: str) -> pd.Series:
+    """Gom số đo 30 phút về trung vị theo tháng, hoặc theo tuần (bắt đầu thứ Hai)."""
+    if kieu == "thang":
+        return chuoi.resample("MS").median()
+    return chuoi.resample("W-MON", closed="left", label="left").median()
+
+
+def phan_ra(chuoi: pd.Series, kieu: str) -> pd.DataFrame:
+    """STL cộng: Observed = Trend + Seasonal + Residual.
+
+    Ném ValueError (có lý do rõ ràng) nếu chưa đủ dữ liệu.
+    """
+    chu_ky = CHU_KY_STL[kieu]
+    don_vi = DON_VI_KY[kieu]
+    if chuoi.empty:
+        raise ValueError("Chưa có số liệu thực tế nào để phân rã.")
+
+    gom = _gom_trung_vi(chuoi, kieu).iloc[:-1]  # bỏ kỳ cuối vì chưa kết thúc
+    co_so_lieu = gom.dropna()
+    if len(co_so_lieu) < 2 * chu_ky:
+        raise ValueError(
+            f"Cần tối thiểu {2 * chu_ky} {don_vi} có số liệu thật, "
+            f"hiện mới có {len(co_so_lieu)}."
+        )
+
+    gom = gom.loc[co_so_lieu.index[0] : co_so_lieu.index[-1]]
+    if len(co_so_lieu) < TY_LE_TOI_THIEU * len(gom):
+        raise ValueError(
+            f"Dữ liệu bị thiếu nhiều quãng: chỉ có {len(co_so_lieu)}/{len(gom)} "
+            f"{don_vi} có số liệu thật."
+        )
+    gom = gom.interpolate()
+
+    # Thư viện nặng nên chỉ nạp khi đã đủ dữ liệu
+    from statsmodels.tsa.seasonal import STL
+
+    kq = STL(gom, period=chu_ky, robust=True).fit()
+    return pd.DataFrame(
+        {
+            "observed": gom,
+            "trend": kq.trend,
+            "seasonal": kq.seasonal,
+            "resid": kq.resid,
+        }
+    )
+
+
+def _nhan_ky(moc: pd.Timestamp, kieu: str) -> str:
+    if kieu == "thang":
+        return f"Tháng {moc.month}/{moc.year}"
+    iso = moc.isocalendar()
+    return f"Tuần {iso.week}/{iso.year}"
+
+
+THOI_GIAN_NHO_DEM = 300
+_nho_dem: dict = {}
+
+
+def tinh_phan_ra(db: Session, kieu: str) -> dict:
+    """Tính phân rã ngay khi gọi API (chưa lưu DB), nhớ đệm kết quả 5 phút.
+
+    Ném ValueError (có lý do rõ ràng) nếu chưa đủ dữ liệu lịch sử.
+    """
+    bay_gio = time.monotonic()
+    da_nho = _nho_dem.get(kieu)
+    if da_nho is not None and bay_gio - da_nho[0] < THOI_GIAN_NHO_DEM:
+        return da_nho[1]
+
+    bang = phan_ra(_doc_chuoi_thuc_te(db), kieu)
+    theo_thang = bang.groupby(bang.index.month)["seasonal"].mean()
+    nguong = 2 * bang["resid"].std()
+    trend_dau, trend_cuoi = float(bang["trend"].iloc[0]), float(bang["trend"].iloc[-1])
+    thay_doi = (trend_cuoi - trend_dau) / trend_dau * 100 if trend_dau else None
+
+    ket_qua = {
+        "kieu": kieu,
+        "tinh_luc": datetime.now(timezone.utc),
+        "diem": [
+            {
+                "nhan": _nhan_ky(moc, kieu),
+                "observed": round(float(h["observed"]), 2),
+                "trend": round(float(h["trend"]), 2),
+                "seasonal": round(float(h["seasonal"]), 2),
+                "resid": round(float(h["resid"]), 2),
+            }
+            for moc, h in bang.iterrows()
+        ],
+        "thong_ke": {
+            "thay_doi_trend_phan_tram": None if thay_doi is None else round(thay_doi, 1),
+            "chenh_dong_he": round(float(theo_thang.max() - theo_thang.min()), 1),
+            "so_bat_thuong": 0 if pd.isna(nguong) else int((bang["resid"].abs() > nguong).sum()),
+        },
+    }
+    _nho_dem[kieu] = (bay_gio, ket_qua)
+    return ket_qua

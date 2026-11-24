@@ -212,3 +212,65 @@
     align-items: flex-start;
   }
 }
+
+.bieu-do-phan-ra {
+  min-width: 0;
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid #e9eeec;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.phan-ra-thong-ke {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.phan-ra-thong-ke > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid #e9eeec;
+  border-radius: 8px;
+  min-width: 0;
+}
+
+.phan-ra-thong-ke span {
+  color: #919c96;
+  font-size: 12px;
+}
+
+.phan-ra-thong-ke strong {
+  color: #293731;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.phan-ra-ten {
+  margin: 10px 0 0 15px;
+  color: #293731;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.bieu-do-trang-thai-loi {
+  padding: 12px 14px;
+  border: 1px dashed #e0c9a6;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #7a5a1e;
+}
+
+@media (max-width: 700px) {
+  .bieu-do-phan-ra {
+    padding: 14px;
+  }
+
+  .phan-ra-thong-ke {
+    grid-template-columns: 1fr;
+  }
+}

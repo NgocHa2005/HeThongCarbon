@@ -85,3 +85,8 @@ export async function layDashboardPhanTich() {
   const { data } = await client.get("/api/v1/analysis/dashboard");
   return data;
 }
+
+export async function layPhanRa(kieu = "thang") {
+  const { data } = await client.get("/api/v1/analysis/decomposition", { params: { kieu } });
+  return data;
+}

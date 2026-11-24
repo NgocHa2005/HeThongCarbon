@@ -6,6 +6,7 @@ import TheChiSoThoiGianThuc from "../thanhPhan/trangChu/TheChiSoThoiGianThuc";
 import BieuDoChuoiThoiGian from "../thanhPhan/trangChu/BieuDoChuoiThoiGian";
 import BieuDoBocTach from "../thanhPhan/trangChu/BieuDoBocTach";
 import BieuDoTanSuat from "../thanhPhan/trangChu/BieuDoTanSuat";
+import BieuDoPhanRa from "../thanhPhan/trangChu/BieuDoPhanRa";
 
 export default function TrangDashboardCongKhai() {
   return (
@@ -28,6 +29,7 @@ export default function TrangDashboardCongKhai() {
       <BieuDoChuoiThoiGian />
       <BieuDoBocTach />
       <BieuDoTanSuat />
+      <BieuDoPhanRa />
       <BieuDoPhanCumKMeans />
       <BieuDoDuBaoNgayMai />
     </div>
