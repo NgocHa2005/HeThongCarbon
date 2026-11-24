@@ -106,6 +106,14 @@ export function GiaoDienTheChiSo({ hienTai, homNay, dangTai, loi }) {
           <div className="tq-mini">
             <ResponsiveContainer width="100%" height={64}>
               <BarChart data={chuoi} margin={{ top: 2, right: 0, bottom: 0, left: 0 }}>
+                <Tooltip
+                  isAnimationActive={false}
+                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 20 }}
+                  cursor={{ fill: "rgba(7,134,108,0.12)" }}
+                  labelFormatter={(_, mau) => (mau?.[0]?.payload?.gio ? `${mau[0].payload.gio} UTC` : "")}
+                  formatter={(gt) => [`${so(gt)} gCO₂/kWh`, "Cường độ"]}
+                />
                 <Bar dataKey="gia_tri" fill={MAU_CHINH} fillOpacity={0.55} radius={[2, 2, 0, 0]} isAnimationActive={false} />
               </BarChart>
             </ResponsiveContainer>

@@ -16,7 +16,7 @@ import {
   thongDiepLoiApi
 } from "../../api/axiosClient.js";
 
-export default function BieuDoBocTach() {
+export default function BieuDoPhanTan() {
   const [kieu, setKieu] = useState("ngay");
   const [duLieu, setDuLieu] = useState(null);
   const [dangTai, setDangTai] = useState(true);

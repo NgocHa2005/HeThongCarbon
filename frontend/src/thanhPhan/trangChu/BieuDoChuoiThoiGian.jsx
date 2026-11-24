@@ -10,6 +10,7 @@ import {
   ResponsiveContainer
 } from "recharts";
 import { layBienDong, thongDiepLoiApi } from "../../api/axiosClient.js";
+import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx"
 
 export default function BieuDoChuoiThoiGian() {
     const [kieu, setKieu] = useState("ngay");
@@ -72,7 +73,7 @@ export default function BieuDoChuoiThoiGian() {
 
     // Tạo animation nâng đường biểu đồ từ dưới lên
     useEffect(() => {
-        if (dangTai || loi || duLieuHienThi.length === 0) {
+        if (dangTai || loi || duLieuBieuDo.length === 0) {
             setTienTrinh(0);
             return;
         }
@@ -107,7 +108,7 @@ export default function BieuDoChuoiThoiGian() {
         return () => {
             cancelAnimationFrame(khungHinh);
         };
-    }, [duLieuHienThi, dangTai, loi]);
+    }, [duLieuBieuDo, dangTai, loi]);
 
     // Tăng đồng thời giá trị của tất cả điểm dữ liệu từ 0 lên thực tế
     const duLieuAnimation = useMemo(() => {
@@ -300,6 +301,9 @@ export default function BieuDoChuoiThoiGian() {
                         />
                     </LineChart>
                 </ResponsiveContainer>
+                {!dangTai && !loi && daZoom && (
+                    <ThanhTruotPhamVi tong={duLieuBieuDo.length} phamVi={phamVi} onDoi={setPhamVi} />
+                )}
             </div>
 
             {dangTai && (

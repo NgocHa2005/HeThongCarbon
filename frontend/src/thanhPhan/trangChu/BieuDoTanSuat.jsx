@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
@@ -13,6 +13,7 @@ import {
   layTanSuat,
   thongDiepLoiApi
 } from "../../api/axiosClient.js";
+import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx"
 
 export default function BieuDoTanSuat() {
   const [kieu, setKieu] = useState("ngay");
@@ -56,7 +57,18 @@ export default function BieuDoTanSuat() {
     };
   }, [kieu]);
 
-  const duLieuBieuDo = duLieu?.cac_khoang || [];
+ const duLieuBieuDo = useMemo(() => {
+  const cac = duLieu?.cac_khoang || [];
+  if (cac.length === 0) return [];
+  const theoMoc = new Map(cac.map((k) => [parseInt(k.khoang, 10), k]));
+  const mocDau = Math.min(...theoMoc.keys());
+  const mocCuoi = Math.max(...theoMoc.keys());
+  const ketQua = [];
+  for (let m = mocDau; m <= mocCuoi; m += 20) {
+    ketQua.push(theoMoc.get(m) ?? { khoang: `${m}-${m + 20}`, so_luong: 0 });
+  }
+  return ketQua;
+}, [duLieu]);
 
   useEffect(() => {
     setPhamVi([0, Math.max(0, duLieuBieuDo.length - 1)]);
@@ -228,24 +240,14 @@ export default function BieuDoTanSuat() {
             margin={{
               top: 15,
               right: 20,
-              bottom: 35,
+              bottom: 5,
               left: 15
             }}
           >
             <CartesianGrid strokeDasharray="3 3" />
 
-            <XAxis
-              dataKey="khoang"
-              tick={{ fontSize: 11 }}
-              tickMargin={10}
-              interval="preserveStartEnd"
-              label={{
-                value: "Cường độ (gCO₂/kWh)",
-                position: "insideBottom",
-                offset: -25,
-                style: { fontSize: 12 }
-              }}
-            />
+            <XAxis dataKey="khoang" tick={{ fontSize: 10 }} interval={0}
+              angle={-40} textAnchor="end" height={56} tickMargin={6} />
 
             <YAxis
               allowDecimals={false}
@@ -278,6 +280,12 @@ export default function BieuDoTanSuat() {
             />
           </BarChart>
         </ResponsiveContainer>
+        {!dangTai && !loi && daZoom && (
+          <ThanhTruotPhamVi tong={duLieuBieuDo.length} phamVi={phamVi} onDoi={setPhamVi} />
+        )}
+        {!dangTai && !loi && duLieuBieuDo.length > 0 && (
+          <p className="truc-x-tieu-de">Cường độ (gCO₂/kWh)</p>
+        )}
       </div>
 
       {dangTai && (

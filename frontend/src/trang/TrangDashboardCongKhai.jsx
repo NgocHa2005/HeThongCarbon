@@ -75,12 +75,12 @@ function docMucTuDiaChi() {
 function DongHoUtc() {
   const [gio, setGio] = useState(() => new Date());
   useEffect(() => {
-    const id = setInterval(() => setGio(new Date()), 30000);
+    const id = setInterval(() => setGio(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
   return (
     <span className="kd-dong-ho">
-      <Clock size={14} /> {gio.toISOString().slice(11, 16)} UTC
+      <Clock size={14} /> {gio.toISOString().slice(11, 19)} UTC
     </span>
   );
 }
