@@ -110,4 +110,12 @@ Git tự tạo thư mục `HeThongCarbon`; không cần tạo thư mục trướ
 ```powershell
 git clone https://github.com/NgocHa2005/HeThongCarbon.git HeThongCarbon
 Set-Location HeThongCarbon
+
+
+.venv\Scripts\Activate.ps1
+uvicorn main:app --reload
+npm run dev
+
+$env:VITE_API_URL="http://localhost:8001"; npm run dev
+
 ```

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func
-from sqlalchemy.orm import Session, joinedload
-
 from config.database import lay_phien_db
 from config.settings import GLOBAL_REGION_ID
-from models import DimRegion as DuLieuKhuVuc, FactCarbonReading as SoLieuCarbon
+from fastapi import APIRouter, Depends, HTTPException
+from models import DimRegion as DuLieuKhuVuc
+from models import FactCarbonReading as SoLieuCarbon
+from sqlalchemy import func
+from sqlalchemy.orm import Session, joinedload
 
 router = APIRouter(prefix="/api/v1", tags=["Dữ liệu công khai"])
 
@@ -13,18 +13,18 @@ def _carbon_dict(row: SoLieuCarbon) -> dict:
     mix = row.generation_mix
     return {
         "thoi_gian": row.FromTime,
-        "cuong_do": (row.IntensityActual if row.IntensityActual is not None else row.IntensityForecast),
+        "cuong_do": (
+            row.IntensityActual
+            if row.IntensityActual is not None
+            else row.IntensityForecast
+        ),
         "muc_do": row.IntensityIndex,
         "phat_thai": None,
-        "tai_tao": (
-            mix.WindPerc + mix.SolarPerc + mix.HydroPerc + mix.BiomassPerc
-            if mix
-            else None
-        ),
-        "khi": mix.GasPerc if mix else None,
-        "hat_nhan": mix.NuclearPerc if mix else None,
-        "gio": mix.WindPerc if mix else None,
-        "mat_troi": mix.SolarPerc if mix else None,
+        "tai_tao": (mix.wind + mix.solar + mix.hydro + mix.biomass if mix else None),
+        "khi": mix.gas if mix else None,
+        "hat_nhan": mix.nuclear if mix else None,
+        "gio": mix.wind if mix else None,
+        "mat_troi": mix.solar if mix else None,
     }
 
 
@@ -81,7 +81,11 @@ def lay_du_lieu_khu_vuc(db: Session = Depends(lay_phien_db)):
                 "ma_vung": region.RegionId,
                 "ten_vung": region.ShortName,
                 "thoi_gian": reading.FromTime,
-                "cuong_do": (reading.IntensityActual if reading.IntensityActual is not None else reading.IntensityForecast),
+                "cuong_do": (
+                    reading.IntensityActual
+                    if reading.IntensityActual is not None
+                    else reading.IntensityForecast
+                ),
                 "muc_do": reading.IntensityIndex,
             }
             for reading, region in rows
@@ -100,7 +104,14 @@ def lay_du_bao_co_so(db: Session = Depends(lay_phien_db)):
     )
     if not latest_rows:
         raise HTTPException(status_code=404, detail="Chưa có dữ liệu để lập dự báo.")
-    baseline = sum((row.IntensityActual if row.IntensityActual is not None else row.IntensityForecast) for row in latest_rows) / len(latest_rows)
+    baseline = sum(
+        (
+            row.IntensityActual
+            if row.IntensityActual is not None
+            else row.IntensityForecast
+        )
+        for row in latest_rows
+    ) / len(latest_rows)
     latest = latest_rows[0]
     return {
         "method": "baseline_average",
