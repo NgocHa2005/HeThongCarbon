@@ -986,3 +986,100 @@ a.the-dieu-huong:hover {
   color: #77837e;
   font-size: 12px;
 }
+
+/* Bổ sung style tương thích cho BieuDoPhanCumKMeans bên giao diện User */
+.phan-tich-wrapper .bieu-do-thoi-gian,
+.phan-tich-wrapper .bieu-do-phan-bo,
+.phan-tich-wrapper .bieu-do-tan-suat,
+.phan-tich-wrapper .bieu-do-phan-ra {
+  margin: 0;
+  border-radius: 16px;
+  border-color: #e2e8f0;
+}
+
+.phan-tich-wrapper .card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.phan-tich-wrapper .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.phan-tich-wrapper .button-primary {
+  background: #07866c;
+  color: #ffffff;
+  border: 1px solid #07866c;
+}
+
+.phan-tich-wrapper .button-primary:hover {
+  background: #066f59;
+}
+
+.phan-tich-wrapper .button-secondary {
+  background: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.phan-tich-wrapper .button-secondary:hover {
+  background: #f8fafc;
+}
+
+.phan-tich-wrapper .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 600;
+}
+
+.phan-tich-wrapper .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.phan-tich-wrapper .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.phan-tich-wrapper .table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.phan-tich-wrapper .table-wrap th {
+  padding: 12px 20px;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 700;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.phan-tich-wrapper .table-wrap td {
+  padding: 12px 20px;
+  color: #1e293b;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.phan-tich-wrapper .error-banner {
+  padding: 16px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}

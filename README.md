@@ -113,6 +113,7 @@ Set-Location HeThongCarbon
 
 
 .venv\Scripts\Activate.ps1
+python -m workers.prediction.tomorrow_forecaster
 uvicorn main:app --reload
 npm run dev
 
