@@ -211,14 +211,15 @@ export default function TrangDuBao_SacXeDien() {
 
       {/* 2. Hàng 3 Thẻ kết quả từ EvRecommendationResponse */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-2xl p-5 bg-gradient-to-br from-emerald-800 to-emerald-600 text-white shadow-sm">
+        {/* Thẻ 1: Khung Giờ Tối Ưu */}
+        <div className="rounded-2xl p-5 bg-gradient-to-br from-emerald-800 to-emerald-600 text-white shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-emerald-100 text-xs font-semibold uppercase tracking-wide">
             <span>Khung Giờ Tối Ưu (Nên Sạc)</span>
             <Zap size={17} />
           </div>
-          <div className="mt-3 text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <div className="mt-3 text-lg sm:text-xl xl:text-2xl font-extrabold tracking-tight tabular-nums whitespace-nowrap">
             {data
-              ? `${dinhDangGio(data.optimal_start_time)} – ${dinhDangGio(data.optimal_end_time)}`
+              ? `${dinhDangGio(data.optimal_start_time).replace(" UTC", "")} – ${dinhDangGio(data.optimal_end_time)}`
               : "—"}
           </div>
           <p className="mt-2 text-xs text-emerald-100">
@@ -228,17 +229,18 @@ export default function TrangDuBao_SacXeDien() {
           </p>
         </div>
 
-        <div className="rounded-2xl p-5 bg-white border border-slate-200/80 shadow-sm">
+        {/* Thẻ 2: Lượng Phát Thải Tiết Kiệm */}
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wide">
             <span>Lượng Phát Thải Tiết Kiệm</span>
             <TrendingDown size={17} className="text-emerald-600" />
           </div>
-          <div className="flex items-baseline gap-2 mt-3">
-            <span className="text-3xl font-extrabold text-emerald-700">
+          <div className="flex items-baseline gap-2 mt-3 flex-nowrap">
+            <span className="text-2xl xl:text-3xl font-extrabold text-emerald-700 tabular-nums whitespace-nowrap">
               {data ? `${data.co2_saved_kg.toFixed(2)} kg` : "—"}
             </span>
             {data && (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold whitespace-nowrap">
                 -{data.saving_percent.toFixed(1)}% CO₂
               </span>
             )}
@@ -248,14 +250,15 @@ export default function TrangDuBao_SacXeDien() {
           </p>
         </div>
 
-        <div className="rounded-2xl p-5 bg-white border border-slate-200/80 shadow-sm">
+        {/* Thẻ 3: Khung Giờ Cao Điểm */}
+        <div className="rounded-2xl p-5 bg-white border border-slate-200/80 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wide">
             <span>Khung Giờ Cao Điểm (Tránh Sạc)</span>
             <Flame size={17} className="text-red-600" />
           </div>
-          <div className="mt-3 text-2xl sm:text-3xl font-extrabold text-red-600 tracking-tight">
+          <div className="mt-3 text-lg sm:text-xl xl:text-2xl font-extrabold text-red-600 tracking-tight tabular-nums whitespace-nowrap">
             {data
-              ? `${dinhDangGio(data.peak_start_time)} – ${dinhDangGio(data.peak_end_time)}`
+              ? `${dinhDangGio(data.peak_start_time).replace(" UTC", "")} – ${dinhDangGio(data.peak_end_time)}`
               : "—"}
           </div>
           <p className="mt-2 text-xs text-slate-500">
