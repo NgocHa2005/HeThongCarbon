@@ -206,6 +206,107 @@ class CarbonCollectorTests(unittest.TestCase):
 
         self.assertEqual(arguments.end_exclusive - arguments.start_date, timedelta(days=1))
 
+    def test_backfill_continues_when_optional_source_periods_are_missing(self):
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        end = start + timedelta(hours=1)
+        first_period = "2026-01-01T00:00Z"
+        second_period = "2026-01-01T00:30Z"
+
+        def responder(request):
+            path = unquote(request.url.path).strip("/").split("/")
+            if path[0] == "regional":
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": [
+                            {
+                                "from": first_period,
+                                "to": second_period,
+                                "regions": [
+                                    {
+                                        "regionid": region_id,
+                                        "shortname": f"Region {region_id}",
+                                        "name": f"Region {region_id}",
+                                        "intensity": {
+                                            "forecast": 90,
+                                            "index": "low",
+                                        },
+                                    }
+                                    for region_id in range(1, 18)
+                                ],
+                            }
+                        ]
+                    },
+                )
+            if path[0] == "generation":
+                return httpx.Response(
+                    200,
+                    json={
+                        "data": [
+                            {
+                                "from": first_period,
+                                "generationmix": [
+                                    {"fuel": "wind", "perc": 30},
+                                    {"fuel": "gas", "perc": 40},
+                                    {"fuel": "nuclear", "perc": 30},
+                                ],
+                            }
+                        ]
+                    },
+                )
+            return httpx.Response(
+                200,
+                json={
+                    "data": [
+                        {
+                            "from": first_period,
+                            "to": second_period,
+                            "intensity": {
+                                "actual": 90,
+                                "forecast": 90,
+                                "index": "low",
+                            },
+                        },
+                        {
+                            "from": second_period,
+                            "to": "2026-01-01T01:00Z",
+                            "intensity": {
+                                "actual": 95,
+                                "forecast": 95,
+                                "index": "low",
+                            },
+                        },
+                    ]
+                },
+            )
+
+        class FakeDatabase:
+            def commit(self):
+                pass
+
+        original_async_client = httpx.AsyncClient
+
+        def client_factory(**kwargs):
+            kwargs["transport"] = httpx.MockTransport(responder)
+            return original_async_client(**kwargs)
+
+        with patch.object(collector, "CARBON_API_BASE_URL", "https://carbon.test"), patch.object(
+            collector.httpx, "AsyncClient", client_factory
+        ), patch.object(collector, "_upsert_vung"), patch.object(
+            collector,
+            "_upsert_nhieu_ban_ghi",
+            side_effect=lambda db, rows, mix: (len(rows), 0),
+        ):
+            result = asyncio.run(
+                collector.thu_thap_khoang_thoi_gian(FakeDatabase(), start, end)
+            )
+
+        self.assertEqual(result.inserted, 19)
+        self.assertEqual(result.updated, 0)
+        self.assertTrue(any("thiếu cơ cấu nguồn điện tại 1 mốc" in item for item in result.warnings))
+        self.assertTrue(any("thiếu dữ liệu vùng tại 1 mốc" in item for item in result.warnings))
+        self.assertTrue(all(second_period in item for item in result.warnings))
+
     def test_alert_is_created_once_for_a_30_percent_jump_from_the_prior_day(self):
         engine = _tao_engine()
         Base.metadata.create_all(bind=engine)
@@ -393,10 +494,19 @@ class CarbonCollectorTests(unittest.TestCase):
 
     def test_historical_collection_uses_supported_routes_and_upserts_by_period(self):
         requests = []
+        request_ranges = []
 
         def responder(request):
             path = unquote(request.url.path).strip("/").split("/")
             requests.append(request.url.path)
+            range_start_index = 2 if path[0] == "regional" else 1
+            range_start = datetime.fromisoformat(
+                path[range_start_index].replace("Z", "+00:00")
+            )
+            range_end = datetime.fromisoformat(
+                path[range_start_index + 1].replace("Z", "+00:00")
+            )
+            request_ranges.append((range_start, range_end))
             if path[0] == "regional":
                 from_time, to_time = path[2], path[3]
                 return httpx.Response(
@@ -491,6 +601,12 @@ class CarbonCollectorTests(unittest.TestCase):
             self.assertEqual(
                 len([path for path in requests if path.startswith("/regional/intensity/")]),
                 4,
+            )
+            self.assertTrue(
+                all(
+                    end - start <= timedelta(days=13)
+                    for start, end in request_ranges
+                )
             )
         finally:
             session.close()

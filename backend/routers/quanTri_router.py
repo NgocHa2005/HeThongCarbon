@@ -1,10 +1,4 @@
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Depends
-from sqlalchemy import MetaData, Table, func, inspect, select
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import quoted_name
-from fastapi.encoders import jsonable_encoder
+from datetime import UTC, datetime
 
 from config.database import lay_phien_db
 from config.settings import (
@@ -12,7 +6,15 @@ from config.settings import (
     CARBON_ALERT_THRESHOLD,
     CARBON_ALERT_WINDOW_HOURS,
 )
-from models import DimRegion as DuLieuKhuVuc, FactGenerationMix as GenerationMix, SysIngestionRun as LuotThuThap, FactCarbonReading as SoLieuCarbon
+from fastapi import APIRouter, Depends
+from fastapi.encoders import jsonable_encoder
+from models import DimRegion as DuLieuKhuVuc
+from models import FactCarbonReading as SoLieuCarbon
+from models import FactGenerationMix as GenerationMix
+from models import SysIngestionRun as LuotThuThap
+from sqlalchemy import MetaData, Table, func, inspect, select
+from sqlalchemy.orm import Session
+from sqlalchemy.sql import quoted_name
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Quản trị"])
 COLLECTION_INTERVAL_SECONDS = 1800
@@ -27,8 +29,8 @@ DOWNSTREAM_TABLES = (
 
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value.astimezone(timezone.utc)
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
 
 
 def _tao_ket_qua(job: LuotThuThap) -> dict:
@@ -60,17 +62,15 @@ def _tao_giam_sat(db: Session) -> dict:
         .order_by(LuotThuThap.StartTime.desc())
         .first()
     )
-    latest_job = (
-        db.query(LuotThuThap)
-        .order_by(LuotThuThap.StartTime.desc())
-        .first()
+    latest_job = db.query(LuotThuThap).order_by(LuotThuThap.StartTime.desc()).first()
+    last_success_at = (
+        last_success.EndTime or last_success.StartTime if last_success else None
     )
-    last_success_at = last_success.EndTime or last_success.StartTime if last_success else None
     minutes_since_success = None
     if last_success_at is not None:
         minutes_since_success = max(
             0,
-            int((datetime.now(timezone.utc) - _utc(last_success_at)).total_seconds() // 60),
+            int((datetime.now(UTC) - _utc(last_success_at)).total_seconds() // 60),
         )
 
     latest_status = latest_job.Status.upper() if latest_job else ""
@@ -104,8 +104,7 @@ def _tao_giam_sat(db: Session) -> dict:
 def _doc_canh_bao_chat_luong(db: Session) -> dict:
     warnings = []
     known_region_ids = {
-        region.RegionId
-        for region in db.query(DuLieuKhuVuc.RegionId).all()
+        region.RegionId for region in db.query(DuLieuKhuVuc.RegionId).all()
     }
     known_regions = known_region_ids.intersection(EXPECTED_REGION_IDS)
     missing_dimensions = [
@@ -155,7 +154,9 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
             .group_by(SoLieuCarbon.RegionId)
             .all()
         )
-        latest_by_region = {region_id: _utc(value) for region_id, value in region_latest}
+        latest_by_region = {
+            region_id: _utc(value) for region_id, value in region_latest
+        }
         national_time = _utc(national_latest.FromTime)
         stale_before = national_time.timestamp() - 2 * 60 * 60
         missing_recent_data = [
@@ -200,8 +201,7 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
                 )
 
     table_names = {
-        name.casefold(): name
-        for name in inspect(db.get_bind()).get_table_names()
+        name.casefold(): name for name in inspect(db.get_bind()).get_table_names()
     }
     downstream_tables = {
         name: name.casefold() in table_names for name in DOWNSTREAM_TABLES
@@ -223,8 +223,7 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
             autoload_with=db.get_bind(),
         )
         alert_columns = {
-            column.name.casefold(): column
-            for column in alerts_table.columns
+            column.name.casefold(): column for column in alerts_table.columns
         }
         order_column = next(
             (
@@ -241,7 +240,7 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
         alerts = jsonable_encoder([dict(row) for row in rows])
 
     return {
-        "checked_at": datetime.now(timezone.utc),
+        "checked_at": datetime.now(UTC),
         "latest_national_reading_at": latest_at,
         "known_region_count": len(known_regions),
         "expected_region_ids": list(EXPECTED_REGION_IDS),
@@ -265,24 +264,24 @@ def _doc_canh_bao_chat_luong(db: Session) -> dict:
 
 @router.get("/status")
 def lay_trang_thai(db: Session = Depends(lay_phien_db)):
-    latest = (
-        db.query(LuotThuThap)
-        .order_by(LuotThuThap.StartTime.desc())
-        .first()
+    latest = db.query(LuotThuThap).order_by(LuotThuThap.StartTime.desc()).first()
+    result = (
+        _tao_ket_qua(latest)
+        if latest
+        else {
+            "job_id": None,
+            "started_at": None,
+            "completed_at": None,
+            "status": "idle",
+            "stage": None,
+            "records_processed": 0,
+            "records_inserted": 0,
+            "records_updated": 0,
+            "duration_seconds": None,
+            "message": None,
+            "triggered_by": None,
+        }
     )
-    result = _tao_ket_qua(latest) if latest else {
-        "job_id": None,
-        "started_at": None,
-        "completed_at": None,
-        "status": "idle",
-        "stage": None,
-        "records_processed": 0,
-        "records_inserted": 0,
-        "records_updated": 0,
-        "duration_seconds": None,
-        "message": None,
-        "triggered_by": None,
-    }
     result["monitoring"] = _tao_giam_sat(db)
     return result
 

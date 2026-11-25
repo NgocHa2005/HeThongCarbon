@@ -14,7 +14,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 if TYPE_CHECKING:
     from models.dim_region import DimRegion
@@ -66,3 +66,20 @@ class FactCarbonReading(Base):
         back_populates="carbon_reading",
         cascade="all, delete-orphan",
     )
+
+    id = synonym("ReadingId")
+    ma_vung = synonym("RegionId")
+    thoi_gian = synonym("FromTime")
+    den_thoi_gian = synonym("ToTime")
+    cuong_do_du_bao = synonym("IntensityForecast")
+    cuong_do_thuc_te = synonym("IntensityActual")
+    muc_do = synonym("IntensityIndex")
+    gio = synonym("HourOfDay")
+    thu_trong_tuan = synonym("DayOfWeek")
+    thang = synonym("MonthOfYear")
+
+    @property
+    def cuong_do(self) -> int:
+        if self.IntensityActual is not None:
+            return self.IntensityActual
+        return self.IntensityForecast

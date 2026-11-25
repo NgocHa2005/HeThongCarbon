@@ -41,16 +41,19 @@ def main(argv: list[str] | None = None) -> int:
     arguments = _phan_tich_tham_so(argv)
     triggered_by = _ma_kich_hoat(arguments.source, arguments.mode)
     run_id = tao_luot_thu_thap(triggered_by)
-    succeeded = thuc_hien_luot_thu_thap(
+    succeeded, message = thuc_hien_luot_thu_thap(
         run_id,
         arguments.mode,
         arguments.start_date,
         getattr(arguments, "end_exclusive", None),
     )
     if not succeeded:
-        print(f"Phiên thu thập {run_id} thất bại; xem SYS_INGESTION_RUNS.")
+        print(f"Phiên thu thập {run_id} thất bại: {message}")
         return 1
-    print(f"Phiên thu thập {run_id} hoàn tất.")
+    if message:
+        print(f"Phiên thu thập {run_id} hoàn tất với cảnh báo: {message}")
+    else:
+        print(f"Phiên thu thập {run_id} hoàn tất.")
     return 0
 
 

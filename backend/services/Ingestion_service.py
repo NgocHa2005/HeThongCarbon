@@ -1,8 +1,8 @@
 import asyncio
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from config.database import SessionLocal
-from models import LuotThuThap
+from models import SysIngestionRun
 
 from backend.services.caoDuLieu_service import (
     thu_thap_du_lieu,
@@ -13,16 +13,16 @@ from backend.services.caoDuLieu_service import (
 def tao_luot_thu_thap(nguoi_kich_hoat: str) -> int:
     db = SessionLocal()
     try:
-        job = luotThuThap(
-            nguoi_kich_hoat=nguoi_kich_hoat,
-            trang_thai="QUEUED",
-            so_ban_ghi_them=0,
-            so_ban_ghi_cap_nhat=0,
+        job = SysIngestionRun(
+            TriggeredBy=nguoi_kich_hoat,
+            Status="QUEUED",
+            RecordsInserted=0,
+            RecordsUpdated=0,
         )
         db.add(job)
         db.commit()
         db.refresh(job)
-        return job.id
+        return job.RunId
     finally:
         db.close()
 
@@ -32,13 +32,13 @@ def thuc_hien_luot_thu_thap(
     mode: str,
     bat_dau: datetime | None = None,
     ket_thuc: datetime | None = None,
-) -> bool:
+) -> tuple[bool, str | None]:
     db = SessionLocal()
     try:
-        job = db.get(luotThuThap, run_id)
+        job = db.get(SysIngestionRun, run_id)
         if job is None:
             raise RuntimeError(f"Không tìm thấy phiên thu thập {run_id}.")
-        job.trang_thai = "RUNNING"
+        job.Status = "RUNNING"
         db.commit()
 
         if mode == "collect":
@@ -46,10 +46,13 @@ def thuc_hien_luot_thu_thap(
         elif mode == "backfill" and bat_dau is not None and ket_thuc is not None:
 
             def cap_nhat_so_lieu(partial_result):
-                current_job = db.get(luotThuThap, run_id)
+                current_job = db.get(SysIngestionRun, run_id)
                 if current_job is not None:
-                    current_job.so_ban_ghi_them = partial_result.inserted
-                    current_job.so_ban_ghi_cap_nhat = partial_result.updated
+                    current_job.RecordsInserted = partial_result.inserted
+                    current_job.RecordsUpdated = partial_result.updated
+                    current_job.ErrorMessage = (
+                        "; ".join(partial_result.warnings) or None
+                    )
                     db.commit()
 
             result = asyncio.run(
@@ -63,22 +66,23 @@ def thuc_hien_luot_thu_thap(
         else:
             raise ValueError("Chế độ thu thập hoặc khoảng thời gian không hợp lệ.")
 
-        job = db.get(luotThuThap, run_id)
-        job.trang_thai = "SUCCESS"
-        job.so_ban_ghi_them = result.inserted
-        job.so_ban_ghi_cap_nhat = result.updated
-        job.thong_bao_loi = None
-        return True
+        job = db.get(SysIngestionRun, run_id)
+        job.Status = "SUCCESS"
+        job.RecordsInserted = result.inserted
+        job.RecordsUpdated = result.updated
+        job.ErrorMessage = "; ".join(result.warnings) or None
+        return True, job.ErrorMessage
     except Exception as exc:
         db.rollback()
-        job = db.get(luotThuThap, run_id)
+        job = db.get(SysIngestionRun, run_id)
+        error_message = f"Thu thập thất bại ({type(exc).__name__}): {exc}"
         if job is not None:
-            job.trang_thai = "FAILED"
-            job.thong_bao_loi = f"Thu thập thất bại ({type(exc).__name__}): {exc}"
-        return False
+            job.Status = "FAILED"
+            job.ErrorMessage = error_message
+        return False, error_message
     finally:
-        job = db.get(luotThuThap, run_id)
+        job = db.get(SysIngestionRun, run_id)
         if job is not None:
-            job.ket_thuc_luc = datetime.now(UTC)
+            job.EndTime = datetime.now(timezone.utc)
             db.commit()
         db.close()

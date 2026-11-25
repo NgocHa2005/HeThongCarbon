@@ -9,7 +9,7 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     UniqueConstraint,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 
 if TYPE_CHECKING:
     from models.fact_carbon_reading import FactCarbonReading
@@ -48,3 +48,16 @@ class FactGenerationMix(Base):
     carbon_reading: Mapped["FactCarbonReading"] = relationship(
         "FactCarbonReading", back_populates="generation_mix"
     )
+
+    id = synonym("MixId")
+    reading_id = synonym("ReadingId")
+    wind = synonym("WindPerc")
+    solar = synonym("SolarPerc")
+    nuclear = synonym("NuclearPerc")
+    hydro = synonym("HydroPerc")
+    gas = synonym("GasPerc")
+    coal = synonym("CoalPerc")
+    biomass = synonym("BiomassPerc")
+    imports = synonym("ImportsPerc")
+    clean_total = synonym("CleanTotalPerc")
+    fossil_total = synonym("FossilTotalPerc")

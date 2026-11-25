@@ -10,7 +10,7 @@ from sqlalchemy import (
     Text,
     text,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, synonym
 
 
 class SysIngestionRun(Base):
@@ -31,3 +31,12 @@ class SysIngestionRun(Base):
     )
     Status: Mapped[str] = mapped_column(String(20), nullable=False)
     ErrorMessage: Mapped[str | None] = mapped_column(Text)
+
+    id = synonym("RunId")
+    nguoi_kich_hoat = synonym("TriggeredBy")
+    bat_dau_luc = synonym("StartTime")
+    ket_thuc_luc = synonym("EndTime")
+    so_ban_ghi_them = synonym("RecordsInserted")
+    so_ban_ghi_cap_nhat = synonym("RecordsUpdated")
+    trang_thai = synonym("Status")
+    thong_bao_loi = synonym("ErrorMessage")

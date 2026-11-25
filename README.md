@@ -61,7 +61,7 @@ Trong trang GitHub Actions, mở **Carbon data collection → Run workflow**:
 - `collect`: lấy dữ liệu mới nhất ngay.
 - `backfill`: nhập `start_date` và `end_date` theo `YYYY-MM-DD` (UTC); cả hai ngày đều được tính.
 
-Workflow chia backfill thành các request tối đa 14 ngày và giới hạn mỗi lần chạy tối đa 730 ngày. Các bản ghi được upsert theo vùng và thời điểm, nên chạy lại cùng khoảng không tạo bản ghi trùng.
+Workflow chia backfill thành các request tối đa 13 ngày để nằm an toàn dưới giới hạn 14 ngày của Carbon Intensity API, và giới hạn mỗi lần chạy tối đa 730 ngày. Backfill lưu các mốc mà API có dữ liệu, tiếp tục qua mốc thiếu ở từng nguồn và ghi cảnh báo vào log Actions cùng `SYS_INGESTION_RUNS.ErrorMessage`; lỗi request/API vẫn làm phiên thất bại. Các bản ghi được upsert theo vùng và thời điểm, nên chạy lại cùng khoảng không tạo bản ghi trùng.
 
 Trang `/admin` có liên kết mở workflow để chạy thủ công hoặc backfill. Lịch tự động không có nút dừng trong backend; có thể tắt workflow trong tab **Actions** hoặc sửa cron trong file workflow.
 
@@ -110,4 +110,12 @@ Git tự tạo thư mục `HeThongCarbon`; không cần tạo thư mục trướ
 ```powershell
 git clone https://github.com/NgocHa2005/HeThongCarbon.git HeThongCarbon
 Set-Location HeThongCarbon
+
+
+.venv\Scripts\Activate.ps1
+uvicorn main:app --reload
+npm run dev
+
+$env:VITE_API_URL="http://localhost:8001"; npm run dev
+
 ```
