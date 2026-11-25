@@ -20,6 +20,7 @@ from models import DuLieuKhuVuc, GenerationMix, SoLieuCarbon
 class KetQuaThuThap:
     inserted: int
     updated: int
+    warnings: tuple[str, ...] = ()
 
     @property
     def total(self) -> int:
@@ -336,7 +337,7 @@ async def thu_thap_du_lieu(
         )
         .one()
     )
-    from services.dichVuCanhBao import kiem_tra_canh_bao_cuong_do
+    from backend.services.canhBao_service import kiem_tra_canh_bao_cuong_do
 
     kiem_tra_canh_bao_cuong_do(db, national_reading)
 
@@ -407,11 +408,41 @@ async def thu_thap_khoang_thoi_gian(
 
     inserted = 0
     updated = 0
+    missing_counts = {
+        "national": 0,
+        "generation": 0,
+        "regional": 0,
+        "region_ids": 0,
+    }
+    missing_examples = {name: [] for name in missing_counts}
+    warning_labels = {
+        "national": "thiếu cường độ toàn quốc",
+        "generation": "thiếu cơ cấu nguồn điện",
+        "regional": "thiếu dữ liệu vùng",
+        "region_ids": "thiếu bản ghi vùng",
+    }
+
+    def ghi_nhan_thieu(loai: str, chi_tiet: str) -> None:
+        missing_counts[loai] += 1
+        if len(missing_examples[loai]) < 3:
+            missing_examples[loai].append(chi_tiet)
+
+    def tao_canh_bao() -> tuple[str, ...]:
+        return tuple(
+            f"{warning_labels[name]} tại {count} mốc/vùng"
+            + (
+                f" (ví dụ: {', '.join(missing_examples[name])})"
+                if missing_examples[name]
+                else ""
+            )
+            for name, count in missing_counts.items()
+            if count
+        )
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         cursor = bat_dau
         while cursor < ket_thuc:
-            window_end = min(cursor + timedelta(days=14), ket_thuc)
+            window_end = min(cursor + timedelta(days=13), ket_thuc)
             start_text = cursor.strftime("%Y-%m-%dT%H:%MZ")
             end_text = window_end.strftime("%Y-%m-%dT%H:%MZ")
             intensity_result, generation_result, regional_result = await asyncio.gather(
@@ -433,78 +464,87 @@ async def thu_thap_khoang_thoi_gian(
                 if item.get("from")
                 and cursor <= _doc_thoi_gian(item.get("from")) < window_end
             }
-            national_periods = [
-                item
+            national_by_time = {
+                _doc_thoi_gian(item.get("from")): item
                 for item in intensity_result.get("data") or []
                 if item.get("from")
                 and cursor <= _doc_thoi_gian(item.get("from")) < window_end
-            ]
-            if not national_periods:
-                raise RuntimeError("Carbon Intensity API không trả về dữ liệu lịch sử.")
-
-            regional_periods = regional_result.get("data") or []
+            }
             regional_by_time = {
                 _doc_thoi_gian(item.get("from")): item
-                for item in regional_periods
+                for item in regional_result.get("data") or []
                 if item.get("from")
                 and cursor <= _doc_thoi_gian(item.get("from")) < window_end
             }
-            if not regional_by_time:
-                raise RuntimeError("Carbon Intensity API không trả về dữ liệu vùng lịch sử.")
 
             region_names = {
                 GLOBAL_REGION_ID: (GLOBAL_REGION_SHORT_NAME, GLOBAL_REGION_FULL_NAME)
             }
             reading_rows = {}
-            for period in national_periods:
-                period_time = _doc_thoi_gian(period.get("from"))
-                if generation_by_time.get(period_time) is None:
-                    raise RuntimeError(
-                        f"Thiếu dữ liệu cơ cấu nguồn điện tại {period.get('from')}."
+            period_time = cursor
+            while period_time < window_end:
+                period_label = period_time.strftime("%Y-%m-%dT%H:%MZ")
+                national_period = national_by_time.get(period_time)
+                if national_period is None:
+                    ghi_nhan_thieu("national", period_label)
+                else:
+                    reading_rows[(GLOBAL_REGION_ID, period_time)] = (
+                        _tao_gia_tri_ban_ghi(GLOBAL_REGION_ID, national_period)
                     )
-                reading_rows[(GLOBAL_REGION_ID, period_time)] = _tao_gia_tri_ban_ghi(
-                    GLOBAL_REGION_ID,
-                    period,
-                )
+
+                if generation_by_time.get(period_time) is None:
+                    ghi_nhan_thieu("generation", period_label)
 
                 regional_period = regional_by_time.get(period_time)
                 if regional_period is None:
-                    raise RuntimeError(
-                        f"Thiếu dữ liệu vùng tại {period.get('from')}."
-                    )
-                regions = regional_period.get("regions") or []
-                region_ids = {
-                    int(region["regionid"])
-                    for region in regions
-                    if region.get("regionid") is not None
-                    and 1 <= int(region["regionid"]) <= 17
-                }
-                if region_ids != set(range(1, 18)):
-                    raise RuntimeError(
-                        f"API vùng không trả về đủ IDs 1–17 tại {period.get('from')}."
-                    )
-                for region in regions:
-                    if region.get("regionid") is None:
-                        continue
-                    region_id = int(region["regionid"])
-                    if not 1 <= region_id <= 17:
-                        continue
-                    short_name = region.get("shortname") or region.get("name")
-                    if not short_name:
-                        raise RuntimeError(f"Vùng {region_id} thiếu tên trong dữ liệu API.")
-                    region_names[region_id] = (
-                        short_name,
-                        region.get("name") or short_name,
-                    )
-                    region_record = {
-                        "from": regional_period.get("from"),
-                        "to": regional_period.get("to"),
-                        "intensity": region.get("intensity") or {},
+                    ghi_nhan_thieu("regional", period_label)
+                else:
+                    regions = regional_period.get("regions") or []
+                    region_ids = {
+                        int(region["regionid"])
+                        for region in regions
+                        if region.get("regionid") is not None
+                        and 1 <= int(region["regionid"]) <= 17
                     }
-                    reading_rows[(region_id, period_time)] = _tao_gia_tri_ban_ghi(
-                        region_id,
-                        region_record,
-                    )
+                    missing_region_ids = sorted(set(range(1, 18)) - region_ids)
+                    if missing_region_ids:
+                        ghi_nhan_thieu(
+                            "region_ids",
+                            f"{period_label}: {missing_region_ids}",
+                        )
+
+                    for region in regions:
+                        if region.get("regionid") is None:
+                            continue
+                        region_id = int(region["regionid"])
+                        if not 1 <= region_id <= 17:
+                            continue
+                        short_name = region.get("shortname") or region.get("name")
+                        if not short_name:
+                            ghi_nhan_thieu(
+                                "region_ids",
+                                f"{period_label}: vùng {region_id} thiếu tên",
+                            )
+                            continue
+                        region_names[region_id] = (
+                            short_name,
+                            region.get("name") or short_name,
+                        )
+                        region_record = {
+                            "from": regional_period.get("from"),
+                            "to": regional_period.get("to"),
+                            "intensity": region.get("intensity") or {},
+                        }
+                        try:
+                            reading_rows[(region_id, period_time)] = (
+                                _tao_gia_tri_ban_ghi(region_id, region_record)
+                            )
+                        except ValueError as exc:
+                            ghi_nhan_thieu(
+                                "region_ids",
+                                f"{period_label}: vùng {region_id} ({exc})",
+                            )
+                period_time += timedelta(minutes=30)
 
             for region_id, (short_name, full_name) in region_names.items():
                 _upsert_vung(db, region_id, short_name, full_name)
@@ -520,8 +560,18 @@ async def thu_thap_khoang_thoi_gian(
             db.commit()
             cursor = window_end
             if cap_nhat_ket_qua:
-                cap_nhat_ket_qua(KetQuaThuThap(inserted=inserted, updated=updated))
+                cap_nhat_ket_qua(
+                    KetQuaThuThap(
+                        inserted=inserted,
+                        updated=updated,
+                        warnings=tao_canh_bao(),
+                    )
+                )
             if cap_nhat_giai_doan:
                 cap_nhat_giai_doan("database")
 
-    return KetQuaThuThap(inserted=inserted, updated=updated)
+    return KetQuaThuThap(
+        inserted=inserted,
+        updated=updated,
+        warnings=tao_canh_bao(),
+    )
