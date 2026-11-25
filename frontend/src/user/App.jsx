@@ -7,8 +7,9 @@ import {
   layLichSuCarbon,
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
-import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans.jsx";
-import BieuDoDuBaoNgayMai from "../thanhPhan/khaiPha/BieuDoDuBaoNgayMai.jsx";
+
+import TrangDashboardCongKhai from "../trang/TrangDashboardCongKhai.jsx";
+
 import "./user.css";
 import PublicLayout from "./PublicLayout";
 
@@ -80,11 +81,7 @@ function UserApp() {
     ["Hạt nhân", snapshot?.hat_nhan, "%", "purple"],
   ];
 
-  const danhSachTabUser = [
-    { id: "tong-quan", label: "Tổng quan lưới điện", icon: Activity },
-    { id: "du-bao-ev", label: "Dự báo & Sạc EV", icon: Zap },
-    { id: "khu-vuc-dno", label: "So sánh 14 vùng DNO", icon: MapPin },
-  ];
+ 
 
   return (
     <PublicLayout tabHienTai={tabHienTai} onChonTab={setTabHienTai}>
@@ -95,6 +92,8 @@ function UserApp() {
       {tabHienTai === "thuat-toan-ai" && <TrangAI_Machinearning />}
     </PublicLayout>
   );
+
+  return <TrangDashboardCongKhai trangNguonDien={trangNguonDien} />;
 }
 
 export default UserApp;
