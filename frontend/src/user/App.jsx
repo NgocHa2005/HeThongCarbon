@@ -7,6 +7,8 @@ import {
   layLichSuCarbon,
   thongDiepLoiApi,
 } from "../api/axiosClient.js";
+import BieuDoPhanCumKMeans from "../thanhPhan/khaiPha/BieuDoPhanCumKMeans.jsx";
+import BieuDoDuBaoNgayMai from "../thanhPhan/khaiPha/BieuDoDuBaoNgayMai.jsx";
 import "./user.css";
 import PublicLayout from "./PublicLayout";
 

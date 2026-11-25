@@ -44,3 +44,17 @@ export function thongDiepLoiApi(error) {
     "Không thể kết nối tới máy chủ."
   );
 }
+
+export async function layTongQuanPhanCum(params = {}) {
+  const { data } = await client.get("/phan-tich/phan-cum/tong-quan", {
+    params,
+  });
+  return data;
+}
+
+export async function layDuBaoNgayMai(params = {}) {
+  const { data } = await client.get("/phan-tich/du-bao/ngay-mai", {
+    params,
+  });
+  return data;
+}

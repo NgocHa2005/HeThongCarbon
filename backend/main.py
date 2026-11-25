@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import khu_vuc_ev_router, nang_luong_router
 from routers.congKhai_router import router as public_router
+from routers.phanTich_router import router as analysis_router
 from routers.quanTri_router import router as admin_router
 
 
@@ -31,6 +32,7 @@ app.include_router(admin_router)
 app.include_router(public_router)
 app.include_router(nang_luong_router.router)
 app.include_router(khu_vuc_ev_router.router)
+app.include_router(analysis_router)
 
 
 @app.get("/health", tags=["Hệ thống"])
