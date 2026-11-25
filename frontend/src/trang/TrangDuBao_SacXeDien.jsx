@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BatteryCharging,
-  Calendar,
   Clock,
   Download,
   Flame,
@@ -51,7 +50,6 @@ export default function TrangDuBao_SacXeDien() {
   // Tham số người dùng nhập cho phiên sạc EV
   const [durationHours, setDurationHours] = useState(2);
   const [batteryKwh, setBatteryKwh] = useState(60);
-  const [targetDate, setTargetDate] = useState("");
 
   // Dữ liệu duy nhất từ FACT_ML_PREDICTIONS (/phan-tich/du-bao/ngay-mai)
   const [data, setData] = useState(null);
@@ -67,8 +65,7 @@ export default function TrangDuBao_SacXeDien() {
       setLoading(true);
       setErrorMsg("");
       try {
-        const params = targetDate ? { target_date: targetDate } : {};
-        const resData = await layDuBaoNgayMai(params);
+        const resData = await layDuBaoNgayMai();
         if (active) {
           setData(resData);
         }
@@ -76,7 +73,7 @@ export default function TrangDuBao_SacXeDien() {
         if (!active) return;
         setErrorMsg(
           err?.response?.status === 404
-            ? err.response?.data?.detail || "Chưa có dữ liệu dự báo cho ngày đã chọn (UTC)."
+            ? err.response?.data?.detail || "Chưa có dữ liệu dự báo ngày mai (UTC)."
             : thongDiepLoiApi(err)
         );
         setData(null);
@@ -91,7 +88,7 @@ export default function TrangDuBao_SacXeDien() {
     return () => {
       active = false;
     };
-  }, [targetDate]);
+  }, []);
 
   // Tính toán khung giờ sạc tối ưu, cao điểm và lượng CO2 tiết kiệm từ chính mảng data.slots
   const evAnalysis = useMemo(() => {
@@ -305,7 +302,7 @@ export default function TrangDuBao_SacXeDien() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 1. Thanh điều khiển tham số sạc EV & ngày dự báo */}
+      {/* 1. Thanh điều khiển tham số sạc EV */}
       <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-start gap-3.5">
           <div className="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
@@ -321,8 +318,8 @@ export default function TrangDuBao_SacXeDien() {
           </div>
         </div>
 
-        {/* Bộ 3 ô nhập thông số */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Bộ 2 ô nhập thông số */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
             <span className="flex items-center gap-1">
               <Clock size={13} className="text-slate-400" /> Thời lượng sạc (giờ)
@@ -352,19 +349,6 @@ export default function TrangDuBao_SacXeDien() {
               value={batteryKwh}
               onChange={(e) => setBatteryKwh(e.target.value)}
               className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-600"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
-            <span className="flex items-center gap-1">
-              <Calendar size={13} className="text-slate-400" /> Ngày dự báo (UTC)
-            </span>
-            <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              title="Để trống để tự động lấy ngày mai theo UTC"
-              className="h-9 px-3 rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-slate-800 focus:outline-none focus:border-emerald-600"
             />
           </label>
         </div>
@@ -439,7 +423,7 @@ export default function TrangDuBao_SacXeDien() {
         </div>
       )}
 
-      {/* 3. Biểu đồ Dự báo carbon ngày mai (từ BieuDoDuBaoNgayMai + tô vùng sạc EV tối ưu) */}
+      {/* 3. Biểu đồ Dự báo carbon ngày mai */}
       {!loading && !errorMsg && data && chartMeta && evAnalysis && (
         <section
           aria-label="Dự báo carbon ngày mai"
@@ -685,7 +669,7 @@ export default function TrangDuBao_SacXeDien() {
         </section>
       )}
 
-      {/* 4. Bảng chi tiết 48 chu kỳ 30 phút (lấy từ cùng nguồn slots) */}
+      {/* 4. Bảng chi tiết 48 chu kỳ 30 phút */}
       {!loading && !errorMsg && slots.length > 0 && evAnalysis && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
