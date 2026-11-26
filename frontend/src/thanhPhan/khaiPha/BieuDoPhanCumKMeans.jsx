@@ -121,6 +121,67 @@ export default function BieuDoPhanCumKMeans() {
     );
   }, [allDailyClusters, activeTab]);
 
+  const clusterFrequency = useMemo(() => {
+    const total = allDailyClusters.length;
+    const countMap = new Map();
+    for (const c of clusters) {
+      countMap.set(Number(c.ClusterId), 0);
+    }
+
+    for (const row of allDailyClusters) {
+      const cId = Number(row.ClusterId);
+      countMap.set(cId, (countMap.get(cId) || 0) + 1);
+    }
+
+    // Xác định cụm "Xanh" (cường độ thấp nhất / thuận lợi nhất)
+    let greenClusterId = null;
+    if (clusters.length > 0) {
+      const byLowName = clusters.find((c) =>
+        String(c.ClusterName || "").toLowerCase().includes("thấp")
+      );
+      if (byLowName) {
+        greenClusterId = Number(byLowName.ClusterId);
+      } else {
+        const sortedByMean = [...clusters].sort(
+          (a, b) => Number(a.CentroidMeanIntensity) - Number(b.CentroidMeanIntensity)
+        );
+        greenClusterId = Number(sortedByMean[0].ClusterId);
+      }
+    }
+
+    const items = clusters.map((c) => {
+      const cId = Number(c.ClusterId);
+      const count = countMap.get(cId) || 0;
+      const percentage = total > 0 ? Number(((count / total) * 100).toFixed(1)) : 0;
+      return {
+        clusterId: cId,
+        name: c.ClusterName,
+        color: c.ColorHex || "#07866c",
+        count,
+        percentage,
+      };
+    });
+
+    const greenItem = items.find((item) => item.clusterId === greenClusterId);
+    const greenRatio = greenItem ? greenItem.percentage : 0;
+
+    let periodLabel = `toàn bộ dữ liệu (${total} ngày)`;
+    if (startDate && endDate) {
+      periodLabel = `${startDate} → ${endDate} (${total} ngày)`;
+    } else if (startDate) {
+      periodLabel = `từ ${startDate} (${total} ngày)`;
+    } else if (endDate) {
+      periodLabel = `đến ${endDate} (${total} ngày)`;
+    }
+
+    return {
+      total,
+      items,
+      greenRatio,
+      periodLabel,
+    };
+  }, [allDailyClusters, clusters, startDate, endDate]);
+
   const visibleDailyClusters = useMemo(() => {
     if (showAllRows) return filteredDailyClusters;
     return filteredDailyClusters.slice(0, DEFAULT_VISIBLE_ROWS);
@@ -379,6 +440,61 @@ export default function BieuDoPhanCumKMeans() {
           })}
         </div>
 
+        {/* Dải tần suất cụm tối giản */}
+        <div style={{ marginTop: 14 }}>
+          <div
+            style={{
+              height: 8,
+              borderRadius: 999,
+              background: "#e8efec",
+              overflow: "hidden",
+              display: "flex",
+            }}
+          >
+            {clusterFrequency.total > 0 &&
+              clusterFrequency.items.map((item) =>
+                item.count > 0 ? (
+                  <div
+                    key={`bar-${item.clusterId}`}
+                    title={`Cụm ${item.clusterId}: ${item.count} ngày (${item.percentage}%)`}
+                    style={{
+                      width: `${(item.count / clusterFrequency.total) * 100}%`,
+                      background: item.color,
+                    }}
+                  />
+                ) : null
+              )}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 8,
+              fontSize: 12,
+              color: "#52615a",
+              marginTop: 6,
+            }}
+          >
+            <div>
+              {clusterFrequency.items.map((item, idx) => (
+                <span key={`stat-${item.clusterId}`}>
+                  <strong style={{ color: item.color }}>
+                    Cụm {item.clusterId}
+                  </strong>{" "}
+                  {item.count}d ({item.percentage.toFixed(1)}%)
+                  {idx < clusterFrequency.items.length - 1 ? " · " : ""}
+                </span>
+              ))}
+            </div>
+            <strong style={{ color: "#059669" }}>
+              Xanh: {clusterFrequency.greenRatio.toFixed(1)}%
+            </strong>
+          </div>
+        </div>
+        
         {/* Thanh thông tin ngày khi rê chuột qua chấm */}
         <div
           style={{
