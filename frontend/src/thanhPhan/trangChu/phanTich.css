@@ -1083,3 +1083,55 @@ a.the-dieu-huong:hover {
   border: 1px solid #fecaca;
   color: #991b1b;
 }
+
+.pt-chu-giai-muc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: 12px;
+  color: #68756f;
+}
+
+.pt-chu-giai-tieu-de {
+  font-weight: 600;
+  color: #17241f;
+}
+
+.pt-chu-giai-o {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pt-chu-giai-o i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.pt-giai-thich {
+  margin: 4px 0 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f3f7f5;
+  color: #4a5a53;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pt-giai-thich p {
+  margin: 2px 0;
+}
+
+.pt-nhan-xet {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-left: 4px solid #07866c;
+  border-radius: 6px;
+  background: #eef7f3;
+  color: #17241f;
+  font-size: 13.5px;
+  line-height: 1.55;
+}

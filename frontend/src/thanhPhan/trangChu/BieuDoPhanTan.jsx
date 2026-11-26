@@ -9,12 +9,18 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend
+  Legend,
+  ReferenceArea
 } from "recharts";
 import {
   layPhanBo,
   thongDiepLoiApi
 } from "../../api/axiosClient.js";
+
+import ThanhChuGiaiMuc from "./ThanhChuGiaiMuc.jsx";
+import { MUC, useThangMuc, mucCuaGiaTri } from "./thangMuc.js";
+
+const TEN_KHOANG = { ngay: "24 giờ qua", tuan: "7 ngày qua", thang: "30 ngày qua" };
 
 export default function BieuDoPhanTan() {
   const [kieu, setKieu] = useState("ngay");
@@ -22,6 +28,7 @@ export default function BieuDoPhanTan() {
   const [dangTai, setDangTai] = useState(true);
   const [loi, setLoi] = useState("");
   const [doMo, setDoMo] = useState(0);
+  const cacMuc = useThangMuc();
 
   useEffect(() => {
     let dangHoatDong = true;
@@ -74,7 +81,6 @@ export default function BieuDoPhanTan() {
     );
   }, [dangTai, loi, duLieu]);
 
-  // Tạo đủ 24 mốc giờ, giờ thiếu dữ liệu giữ giá trị null.
   const duLieuBieuDo = useMemo(() => {
     return Array.from({ length: 24 }, (_, gio) => ({
       gio,
@@ -84,7 +90,22 @@ export default function BieuDoPhanTan() {
     }));
   }, [trungBinhTheoGio]);
 
-  // Animation Fade In đồng thời cho tất cả điểm dữ liệu thực tế.
+  const nhanXet = useMemo(() => {
+    const ds = duLieuBieuDo.filter((d) => d.trung_binh !== null);
+    if (ds.length === 0 || !cacMuc.length) return null;
+
+    const thap = ds.reduce((a, b) => (b.trung_binh < a.trung_binh ? b : a));
+    const cao = ds.reduce((a, b) => (b.trung_binh > a.trung_binh ? b : a));
+
+    return {
+      thap,
+      cao,
+      chenh: Math.round(cao.trung_binh - thap.trung_binh),
+      mucThap: mucCuaGiaTri(thap.trung_binh, cacMuc),
+      mucCao: mucCuaGiaTri(cao.trung_binh, cacMuc),
+    };
+  }, [duLieuBieuDo, cacMuc]);
+
   useEffect(() => {
     if (dangTai || loi || duLieuGoc.length === 0) {
       setDoMo(0);
@@ -133,10 +154,7 @@ export default function BieuDoPhanTan() {
       <div className="bieu-do-tieu-de">
         <div>
           <h2>Phân bố cường độ carbon theo giờ</h2>
-          <p>
-            Đơn vị: gCO₂/kWh · So sánh dữ liệu thực tế
-            với mức trung bình từng giờ
-          </p>
+          <p>Mỗi chấm là một khung 30 phút; đường vàng là trung bình theo giờ (gCO₂/kWh)</p>
         </div>
 
         <select
@@ -173,11 +191,29 @@ export default function BieuDoPhanTan() {
             />
 
             <YAxis
-              width={55}
+              width={60}
               domain={["dataMin - 10", "dataMax + 10"]}
               tickFormatter={(value) => value}
               tickMargin={8}
+              label={{ value: "gCO₂/kWh", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
             />
+
+            {/* Nền màu theo mức cường độ */}
+            {cacMuc.map((m, i) => {
+              if (m.tu === null) return null;
+              const tiep = cacMuc.slice(i + 1).find((x) => x.tu !== null)?.tu;
+              return (
+                <ReferenceArea
+                  key={m.khoa}
+                  y1={m.tu}
+                  y2={tiep ?? 10000}
+                  ifOverflow="hidden"
+                  fill={MUC.find((x) => x.khoa === m.khoa)?.mau}
+                  fillOpacity={0.12}
+                  strokeOpacity={0}
+                />
+              );
+            })}
 
             <Tooltip
               formatter={(value, name) => [
@@ -213,7 +249,23 @@ export default function BieuDoPhanTan() {
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-
+      
+      {!dangTai && !loi && nhanXet && (
+        <>
+          <div style={{ marginTop: 10 }}>
+            <ThanhChuGiaiMuc />
+          </div>
+          <div className="pt-nhan-xet">
+            <strong>Nhận xét:</strong> trong {TEN_KHOANG[kieu]}, cường độ trung bình thấp nhất lúc{" "}
+            <strong>{nhanXet.thap.gio}h</strong> ({Math.round(nhanXet.thap.trung_binh)} gCO₂/kWh
+            {nhanXet.mucThap && <>, mức {nhanXet.mucThap.ten}</>}) và cao nhất lúc{" "}
+            <strong>{nhanXet.cao.gio}h</strong> ({Math.round(nhanXet.cao.trung_binh)} gCO₂/kWh
+            {nhanXet.mucCao && <>, mức {nhanXet.mucCao.ten}</>}); chênh lệch giữa hai khung giờ là{" "}
+            {nhanXet.chenh} gCO₂/kWh.
+          </div>
+        </>
+      )}
+      
       {dangTai && (
         <p className="bieu-do-trang-thai">
           Đang tải dữ liệu...

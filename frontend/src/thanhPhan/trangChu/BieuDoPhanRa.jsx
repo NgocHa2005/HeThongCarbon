@@ -12,13 +12,35 @@ import {
 import { layPhanRa, thongDiepLoiApi } from "../../api/axiosClient.js";
 
 const BON_BIEU_DO = [
-  { khoa: "observed", ten: "Observed – dữ liệu gốc (trung vị theo kỳ)", mau: "#293731" },
-  { khoa: "trend", ten: "Trend – xu hướng dài hạn", mau: "#07866c" },
-  { khoa: "seasonal", ten: "Seasonal – tính mùa vụ", mau: "#b7791f" },
-  { khoa: "resid", ten: "Residual – phần dư", mau: "#77837e" }
+  { khoa: "observed", ten: "Dữ liệu gốc (Observed): cường độ trung vị của từng kỳ", mau: "#293731" },
+  { khoa: "trend", ten: "Xu hướng dài hạn (Trend): cường độ đang tăng hay giảm qua các kỳ", mau: "#07866c" },
+  { khoa: "seasonal", ten: "Chu kỳ theo mùa (Seasonal): mức tăng giảm lặp lại mỗi năm", mau: "#b7791f" },
+  { khoa: "resid", ten: "Phần bất thường (Residual): phần còn lại sau khi trừ xu hướng và mùa vụ", mau: "#77837e" }
 ];
 const LE_BIEU_DO = { top: 6, right: 20, bottom: 4, left: 15 };
 const CHIEU_CAO = 150;
+
+function taoNhanXet(diem, tk) {
+  const cau = [];
+  const doi = tk?.thay_doi_trend_phan_tram;
+  if (doi !== null && doi !== undefined) {
+    const huong = doi > 0 ? "tăng" : doi < 0 ? "giảm" : "không đổi";
+    cau.push(
+      `Từ ${diem[0].nhan} đến ${diem[diem.length - 1].nhan}, xu hướng dài hạn ${huong}${doi !== 0 ? ` ${Math.abs(doi)}%` : ""}.`
+    );
+  }
+  if (tk?.chenh_dong_he !== null && tk?.chenh_dong_he !== undefined) {
+    cau.push(`Mùa vụ làm cường độ chênh khoảng ${tk.chenh_dong_he} gCO₂/kWh giữa mùa cao và mùa thấp.`);
+  }
+  if (tk?.so_bat_thuong !== null && tk?.so_bat_thuong !== undefined) {
+    cau.push(
+      tk.so_bat_thuong === 0
+        ? "Không có kỳ nào bất thường."
+        : `Có ${tk.so_bat_thuong} kỳ bất thường (lệch hơn 2 độ lệch chuẩn so với quy luật).`
+    );
+  }
+  return cau.join(" ");
+}
 
 function giaTri(v, hauTo = "") {
   return v === null || v === undefined ? "--" : `${v}${hauTo}`;
@@ -62,10 +84,7 @@ export default function BieuDoPhanRa() {
       <div className="bieu-do-tieu-de">
         <div>
           <h2>Phân rã xu hướng và mùa vụ</h2>
-          <p>
-            Đơn vị: gCO₂/kWh · STL, mô hình cộng · Observed = Trend + Seasonal +
-            Residual
-          </p>
+          <p>Tách cường độ carbon (gCO₂/kWh) thành 3 phần: dữ liệu gốc = xu hướng + mùa vụ + bất thường</p>
         </div>
 
         <select value={kieu} onChange={(e) => setKieu(e.target.value)}>
@@ -94,7 +113,7 @@ export default function BieuDoPhanRa() {
               <strong>{giaTri(tk?.chenh_dong_he, " gCO₂/kWh")}</strong>
             </div>
             <div>
-              <span>Điểm bất thường (&gt;2σ)</span>
+              <span>Số kỳ bất thường (lệch &gt; 2σ)</span>
               <strong>{giaTri(tk?.so_bat_thuong)}</strong>
             </div>
           </div>
@@ -133,6 +152,11 @@ export default function BieuDoPhanRa() {
               </ResponsiveContainer>
             </div>
           ))}
+
+          <div className="pt-nhan-xet">
+            <strong>Nhận xét:</strong> {taoNhanXet(diem, tk)}
+          </div>
+          
         </>
       )}
     </section>
