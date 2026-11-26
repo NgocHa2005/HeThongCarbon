@@ -7,13 +7,19 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Cell
 } from "recharts";
 import {
   layTanSuat,
   thongDiepLoiApi
 } from "../../api/axiosClient.js";
-import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx"
+import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx";
+
+import ThanhChuGiaiMuc from "./ThanhChuGiaiMuc.jsx";
+import { useThangMuc, mucCuaGiaTri } from "./thangMuc.js";
+
+const TEN_KHOANG = { ngay: "24 giờ qua", tuan: "7 ngày qua", thang: "30 ngày qua" };
 
 export default function BieuDoTanSuat() {
   const [kieu, setKieu] = useState("ngay");
@@ -23,6 +29,7 @@ export default function BieuDoTanSuat() {
   const [loi, setLoi] = useState("");
 
   const [phamVi, setPhamVi] = useState([0, 0]);
+  const cacMuc = useThangMuc();
 
   useEffect(() => {
     let dangHoatDong = true;
@@ -69,6 +76,28 @@ export default function BieuDoTanSuat() {
   }
   return ketQua;
 }, [duLieu]);
+
+const nhanXet = useMemo(() => {
+  if (duLieuBieuDo.length === 0 || !cacMuc.length) return null;
+  const tong = duLieuBieuDo.reduce((t, k) => t + k.so_luong, 0);
+  if (tong === 0) return null;
+
+  const phoBien = duLieuBieuDo.reduce((a, b) => (b.so_luong > a.so_luong ? b : a));
+  const theoMuc = {};
+  duLieuBieuDo.forEach((k) => {
+    const m = mucCuaGiaTri(parseInt(k.khoang, 10) + 10, cacMuc);
+    if (m) theoMuc[m.ten] = (theoMuc[m.ten] || 0) + k.so_luong;
+  });
+  const xepHang = Object.entries(theoMuc).sort((a, b) => b[1] - a[1]);
+  if (xepHang.length === 0) return null;
+
+  return {
+    phoBien,
+    tyLePhoBien: Math.round((phoBien.so_luong / tong) * 100),
+    mucChinh: xepHang[0][0],
+    tyLeMucChinh: Math.round((xepHang[0][1] / tong) * 100),
+  };
+}, [duLieuBieuDo, cacMuc]);
 
   useEffect(() => {
     setPhamVi([0, Math.max(0, duLieuBieuDo.length - 1)]);
@@ -179,7 +208,7 @@ export default function BieuDoTanSuat() {
       <div className="bieu-do-tieu-de">
         <div>
           <h2>Phân bố tần suất cường độ carbon</h2>
-          <p>Số lượng bản ghi trong từng khoảng cường độ</p>
+          <p>Số khung 30 phút theo từng khoảng cường độ (gCO₂/kWh)</p>
         </div>
 
         <select
@@ -277,16 +306,36 @@ export default function BieuDoTanSuat() {
               isAnimationActive={true}
               animationDuration={900}
               animationEasing="ease-out"
-            />
+            >
+              {duLieuHienThiBieuDo.map((k) => (
+                <Cell
+                  key={k.khoang}
+                  fill={mucCuaGiaTri(parseInt(k.khoang, 10) + 10, cacMuc)?.mau || "#07866c"}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
-        {!dangTai && !loi && daZoom && (
+      </div>
+      {!dangTai && !loi && daZoom && (
           <ThanhTruotPhamVi tong={duLieuBieuDo.length} phamVi={phamVi} onDoi={setPhamVi} />
         )}
-        {!dangTai && !loi && duLieuBieuDo.length > 0 && (
-          <p className="truc-x-tieu-de">Cường độ (gCO₂/kWh)</p>
-        )}
-      </div>
+      {!dangTai && !loi && duLieuBieuDo.length > 0 && (
+        <p className="truc-x-tieu-de">Cường độ (gCO₂/kWh)</p>
+      )}
+
+      {nhanXet && (
+        <>
+          <div style={{ marginTop: 10 }}>
+            <ThanhChuGiaiMuc />
+          </div>
+          <div className="pt-nhan-xet">
+            <strong>Nhận xét:</strong> trong {TEN_KHOANG[kieu]}, khoảng cường độ xuất hiện nhiều nhất là{" "}
+            {nhanXet.phoBien.khoang} gCO₂/kWh ({nhanXet.tyLePhoBien}% số khung 30 phút). Lưới điện chủ yếu ở mức{" "}
+            <strong>{nhanXet.mucChinh}</strong>, chiếm khoảng {nhanXet.tyLeMucChinh}% số khung (ước tính theo điểm giữa mỗi khoảng).
+          </div>
+        </>
+      )}
 
       {dangTai && (
         <p className="bieu-do-trang-thai">

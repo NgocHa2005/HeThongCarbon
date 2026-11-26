@@ -7,10 +7,15 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
+  ReferenceArea
 } from "recharts";
 import { layBienDong, thongDiepLoiApi } from "../../api/axiosClient.js";
-import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx"
+import ThanhTruotPhamVi from "./ThanhTruotPhamVi.jsx";
+import ThanhChuGiaiMuc from "./ThanhChuGiaiMuc.jsx";
+import { MUC, useThangMuc, mucCuaGiaTri } from "./thangMuc.js";
+
+const TEN_KHOANG = { ngay: "24 giờ qua", tuan: "7 ngày qua", thang: "30 ngày qua" };
 
 export default function BieuDoChuoiThoiGian() {
     const [kieu, setKieu] = useState("ngay");
@@ -20,6 +25,7 @@ export default function BieuDoChuoiThoiGian() {
 
     const [phamVi, setPhamVi] = useState([0, 0]);
     const [tienTrinh, setTienTrinh] = useState(0);
+    const cacMuc = useThangMuc();
 
     useEffect(() => {
         let dangHoatDong = true;
@@ -59,6 +65,17 @@ export default function BieuDoChuoiThoiGian() {
             gia_tri: item.cuong_do ?? item.trung_binh
         }));
     }, [duLieu]);
+
+    const nhanXet = useMemo(() => {
+        const ds = duLieuBieuDo.filter((d) => d.gia_tri !== null && d.gia_tri !== undefined);
+        if (ds.length === 0 || !cacMuc.length) return null;
+
+        const tb = ds.reduce((t, d) => t + d.gia_tri, 0) / ds.length;
+        const cao = ds.reduce((a, b) => (b.gia_tri > a.gia_tri ? b : a));
+        const thap = ds.reduce((a, b) => (b.gia_tri < a.gia_tri ? b : a));
+
+        return { tb: Math.round(tb), muc: mucCuaGiaTri(tb, cacMuc), cao, thap };
+    }, [duLieuBieuDo, cacMuc]);
 
     useEffect(() => {
         setPhamVi([0, Math.max(0, duLieuBieuDo.length - 1)]);
@@ -208,7 +225,7 @@ export default function BieuDoChuoiThoiGian() {
             <div className="bieu-do-tieu-de">
                 <div>
                     <h2>Biến động cường độ carbon</h2>
-                    <p>Theo dõi sự thay đổi cường độ carbon theo thời gian</p>
+                    <p>Đường là cường độ carbon (gCO₂/kWh); nền màu cho biết mức từ thấp đến cao</p>
                 </div>
 
                 <select
@@ -276,7 +293,28 @@ export default function BieuDoChuoiThoiGian() {
                             minTickGap={25}
                         />
 
-                        <YAxis domain={[0, giaTriLonNhat]} />
+                        <YAxis
+                            domain={[0, Math.ceil(giaTriLonNhat * 1.1)]}
+                            width={56}
+                            label={{ value: "gCO₂/kWh", angle: -90, position: "insideLeft", style: { fontSize: 11 } }}
+                        />
+
+                        {/* Nền màu theo mức cường độ */}
+                        {cacMuc.map((m, i) => {
+                            if (m.tu === null) return null;
+                            const tiep = cacMuc.slice(i + 1).find((x) => x.tu !== null)?.tu;
+                            return (
+                                <ReferenceArea
+                                    key={m.khoa}
+                                    y1={m.tu}
+                                    y2={tiep ?? 10000}
+                                    ifOverflow="hidden"
+                                    fill={MUC.find((x) => x.khoa === m.khoa)?.mau}
+                                    fillOpacity={0.12}
+                                    strokeOpacity={0}
+                                />
+                            );
+                        })}
 
                         <Tooltip
                             labelFormatter={(value) =>
@@ -301,10 +339,26 @@ export default function BieuDoChuoiThoiGian() {
                         />
                     </LineChart>
                 </ResponsiveContainer>
-                {!dangTai && !loi && daZoom && (
-                    <ThanhTruotPhamVi tong={duLieuBieuDo.length} phamVi={phamVi} onDoi={setPhamVi} />
-                )}
             </div>
+
+            {!dangTai && !loi && daZoom && (
+                <ThanhTruotPhamVi tong={duLieuBieuDo.length} phamVi={phamVi} onDoi={setPhamVi} />
+            )}
+
+            {!dangTai && !loi && nhanXet && (
+                <>
+                    <div style={{ marginTop: 10 }}>
+                        <ThanhChuGiaiMuc />
+                    </div>
+                    <div className="pt-nhan-xet">
+                        <strong>Nhận xét:</strong> trong {TEN_KHOANG[kieu]}, cường độ carbon trung bình là{" "}
+                        <strong>{nhanXet.tb} gCO₂/kWh</strong>
+                        {nhanXet.muc && <>, thuộc mức <strong>{nhanXet.muc.ten}</strong></>}. Cao nhất{" "}
+                        {Math.round(nhanXet.cao.gia_tri)} gCO₂/kWh ({dinhDangThoiGian(nhanXet.cao.thoi_gian)}), thấp nhất{" "}
+                        {Math.round(nhanXet.thap.gia_tri)} gCO₂/kWh ({dinhDangThoiGian(nhanXet.thap.thoi_gian)}).
+                    </div>
+                </>
+            )}
 
             {dangTai && (
                 <p className="bieu-do-trang-thai">Đang tải dữ liệu...</p>

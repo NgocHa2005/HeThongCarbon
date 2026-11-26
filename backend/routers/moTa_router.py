@@ -8,6 +8,7 @@ from services.phanTich_service import (
     tinh_phan_ra,
     phan_bo,
     tan_suat,
+    thang_muc
 )
 
 router = APIRouter(
@@ -22,36 +23,24 @@ def lay_dashboard(db: Session = Depends(lay_phien_db)):
 
 @router.get("/fluctuation")
 def lay_bien_dong(
-    kieu: str = "ngay",
-    db: Session = Depends(lay_phien_db)
+    kieu: str = Query("ngay", pattern="^(ngay|tuan|thang)$"),
+    db: Session = Depends(lay_phien_db),
 ):
-    if kieu not in ["ngay", "tuan", "thang"]:
-        return {
-            "loi": "Kiểu thời gian không hợp lệ. Chọn ngay, tuan hoặc thang."
-        }
-
     return bien_dong(db, kieu)
 
 @router.get("/scatter")
 def lay_phan_bo(
-    kieu: str = "ngay",
-    db: Session = Depends(lay_phien_db)
+    kieu: str = Query("ngay", pattern="^(ngay|tuan|thang)$"),
+    db: Session = Depends(lay_phien_db),
 ):
-    if kieu not in ["ngay", "tuan", "thang"]:
-        return {"loi": "Chọn ngay, tuan hoặc thang."}
-
     return phan_bo(db, kieu)
 
 @router.get("/histogram")
 def lay_tan_suat(
-    kieu: str = "ngay",
-    db: Session = Depends(lay_phien_db)
+    kieu: str = Query("ngay", pattern="^(ngay|tuan|thang)$"),
+    db: Session = Depends(lay_phien_db),
 ):
-    if kieu not in ["ngay", "tuan", "thang"]:
-        return {"loi": "Chọn ngay, tuan hoặc thang."}
-
     return tan_suat(db, kieu)
-
 
 @router.get("/decomposition")
 def lay_phan_ra(
@@ -63,3 +52,7 @@ def lay_phan_ra(
     except ValueError as loi:
         # thiếu dữ liệu lịch sử: trả 404 kèm lý do để giao diện hiện thông báo gọn
         raise HTTPException(status_code=404, detail=str(loi))
+
+@router.get("/thang-muc")
+def lay_thang_muc(db: Session = Depends(lay_phien_db)):
+    return thang_muc(db)

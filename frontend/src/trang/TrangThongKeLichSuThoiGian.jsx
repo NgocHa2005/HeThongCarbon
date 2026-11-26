@@ -5,6 +5,7 @@ import BieuDoChuoiThoiGian from "../thanhPhan/trangChu/BieuDoChuoiThoiGian.jsx";
 import BieuDoPhanTan from "../thanhPhan/trangChu/BieuDoPhanTan.jsx";
 import BieuDoTanSuat from "../thanhPhan/trangChu/BieuDoTanSuat.jsx";
 import "../thanhPhan/trangChu/phanTich.css";
+import ThanhChuGiaiMuc from "../thanhPhan/trangChu/ThanhChuGiaiMuc.jsx";
 
 export default function TrangThongKeLichSuThoiGian() {
   return (
@@ -22,6 +23,10 @@ export default function TrangThongKeLichSuThoiGian() {
             Phân tích biến động cường độ carbon, phân bố theo khung giờ trong ngày và tần suất xuất hiện
           </p>
         </div>
+      </div>
+
+      <div className="bg-white rounded-2xl px-5 py-3 border border-slate-200/80 shadow-sm">
+        <ThanhChuGiaiMuc />
       </div>
 
       {/* Hàng 1: Biểu đồ đường diễn biến theo thời gian (Full width) */}

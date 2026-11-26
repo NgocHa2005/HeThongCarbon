@@ -6,6 +6,8 @@ from config.settings import GLOBAL_REGION_ID
 from models import FactCarbonReading
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func
+
 
 def lay_du_lieu(db: Session):
     return db.query(FactCarbonReading).filter(
@@ -406,3 +408,35 @@ def tinh_phan_ra(db: Session, kieu: str) -> dict:
     }
     _nho_dem[kieu] = (bay_gio, ket_qua)
     return ket_qua
+
+THU_TU_MUC = ["very low", "low", "moderate", "high", "very high"]
+TEN_MUC = {
+    "very low": "Rất thấp",
+    "low": "Thấp",
+    "moderate": "Trung bình",
+    "high": "Cao",
+    "very high": "Rất cao",
+}
+
+NGUONG_NESO = {
+    2024: [0, 35, 110, 190, 270],
+    2025: [0, 30, 100, 180, 250],
+    2026: [0, 25, 90, 170, 230],
+    2027: [0, 20, 80, 160, 210],
+}
+
+def thang_muc(db: Session):
+    moi_nhat = lay_du_lieu(db).order_by(FactCarbonReading.FromTime.desc()).first()
+    nam = moi_nhat.FromTime.year if moi_nhat else datetime.now(UTC).year
+    nam_dung = min(NGUONG_NESO, key=lambda n: abs(n - nam))
+
+    cac_muc = [
+        {"khoa": khoa, "ten": TEN_MUC[khoa], "tu": tu, "den": None, "so_ban_ghi": None}
+        for khoa, tu in zip(THU_TU_MUC, NGUONG_NESO[nam_dung])
+    ]
+    return {
+        "don_vi": "gCO2/kWh",
+        "nam": nam_dung,
+        "nguon": "NESO Carbon Intensity API",
+        "cac_muc": cac_muc,
+    }
