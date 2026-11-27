@@ -120,3 +120,4 @@ npm run dev
 $env:VITE_API_URL="http://localhost:8001"; npm run dev
 
 ```
+python -m workers.clustering.clustering_persistence
