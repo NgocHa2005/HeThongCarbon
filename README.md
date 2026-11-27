@@ -111,13 +111,17 @@ Git tự tạo thư mục `HeThongCarbon`; không cần tạo thư mục trướ
 git clone https://github.com/NgocHa2005/HeThongCarbon.git HeThongCarbon
 Set-Location HeThongCarbon
 
-
+--mở môi trường ảo
 .venv\Scripts\Activate.ps1
+--Trước khi chảy backend
 python -m workers.prediction.tomorrow_forecaster
 uvicorn main:app --reload
+--chảy fronend
 npm run dev
 
 $env:VITE_API_URL="http://localhost:8001"; npm run dev
 
 ```
+--sau khi xóa data
 python -m workers.clustering.clustering_persistence
+//
