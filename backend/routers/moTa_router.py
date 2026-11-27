@@ -55,7 +55,6 @@ def lay_phan_ra(
             phan_ra(_doc_chuoi_thuc_te(db), kieu)
             ly_do = (
                 "Bảng phân rã đang trống. "
-                "Hãy chạy worker analysis (python -m workers.analysis --once)."
             )
         except ValueError as loi:
             ly_do = str(loi)
