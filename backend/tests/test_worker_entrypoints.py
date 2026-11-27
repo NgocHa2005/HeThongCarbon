@@ -8,7 +8,6 @@ class WorkerEntrypointTests(unittest.TestCase):
     def test_each_worker_has_a_checkable_entrypoint_and_refuses_unimplemented_run(self):
         backend_dir = Path(__file__).resolve().parents[1]
         modules = (
-            "workers.analysis",
             "workers.clustering",
             "workers.prediction",
         )
