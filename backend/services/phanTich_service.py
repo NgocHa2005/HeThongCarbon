@@ -1,9 +1,8 @@
-import time
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 from config.settings import GLOBAL_REGION_ID
-from models import FactCarbonReading
+from models import AggDecompositionResample, FactCarbonReading
 from sqlalchemy.orm import Session
 
 from sqlalchemy import func
@@ -363,38 +362,72 @@ def _nhan_ky(moc: pd.Timestamp, kieu: str) -> str:
     return f"Tuần {iso.week}/{iso.year}"
 
 
-THOI_GIAN_NHO_DEM = 300
-_nho_dem: dict = {}
+def tinh_va_luu_phan_ra(db: Session, kieu: str) -> int:
+    """Tính phân rã và ghi đè các dòng của `kieu` trong bảng. Trả về số dòng đã ghi.
 
-
-def tinh_phan_ra(db: Session, kieu: str) -> dict:
-    """Tính phân rã ngay khi gọi API (chưa lưu DB), nhớ đệm kết quả 5 phút.
-
-    Ném ValueError (có lý do rõ ràng) nếu chưa đủ dữ liệu lịch sử.
+    Nếu chưa đủ dữ liệu thì ném ValueError và KHÔNG đụng đến dữ liệu cũ trong bảng.
     """
-    bay_gio = time.monotonic()
-    da_nho = _nho_dem.get(kieu)
-    if da_nho is not None and bay_gio - da_nho[0] < THOI_GIAN_NHO_DEM:
-        return da_nho[1]
-
     bang = phan_ra(_doc_chuoi_thuc_te(db), kieu)
-    theo_thang = bang.groupby(bang.index.month)["seasonal"].mean()
-    nguong = 2 * bang["resid"].std()
+    bay_gio = datetime.now(UTC)
+
+    db.query(AggDecompositionResample).filter(
+        AggDecompositionResample.PeriodType == kieu
+    ).delete(synchronize_session=False)
+    db.add_all(
+        [
+            AggDecompositionResample(
+                PeriodType=kieu,
+                PeriodStartDate=moc.date(),
+                PeriodLabel=_nhan_ky(moc, kieu),
+                ResampleMedian=float(h["observed"]),
+                TrendComponent=float(h["trend"]),
+                SeasonalComponent=float(h["seasonal"]),
+                ResidualComponent=float(h["resid"]),
+                ComputedAt=bay_gio,
+            )
+            for moc, h in bang.iterrows()
+        ]
+    )
+    db.commit()
+    return len(bang)
+
+
+def doc_phan_ra(db: Session, kieu: str) -> dict | None:
+    """Đọc kết quả đã lưu. Bảng trống (chưa tính hoặc đã bị xóa) thì trả None."""
+    dong = (
+        db.query(AggDecompositionResample)
+        .filter(AggDecompositionResample.PeriodType == kieu)
+        .order_by(AggDecompositionResample.PeriodStartDate.asc())
+        .all()
+    )
+    if not dong:
+        return None
+
+    bang = pd.DataFrame(
+        {
+            "thang": [d.PeriodStartDate.month for d in dong],
+            "trend": [d.TrendComponent for d in dong],
+            "seasonal": [d.SeasonalComponent for d in dong],
+            "resid": [d.ResidualComponent for d in dong],
+        }
+    )
     trend_dau, trend_cuoi = float(bang["trend"].iloc[0]), float(bang["trend"].iloc[-1])
     thay_doi = (trend_cuoi - trend_dau) / trend_dau * 100 if trend_dau else None
+    theo_thang = bang.groupby("thang")["seasonal"].mean()
+    nguong = 2 * bang["resid"].std()
 
-    ket_qua = {
+    return {
         "kieu": kieu,
-        "tinh_luc": datetime.now(UTC),
+        "tinh_luc": max(d.ComputedAt for d in dong),
         "diem": [
             {
-                "nhan": _nhan_ky(moc, kieu),
-                "observed": round(float(h["observed"]), 2),
-                "trend": round(float(h["trend"]), 2),
-                "seasonal": round(float(h["seasonal"]), 2),
-                "resid": round(float(h["resid"]), 2),
+                "nhan": d.PeriodLabel,
+                "observed": round(d.ResampleMedian, 2),
+                "trend": round(d.TrendComponent, 2),
+                "seasonal": round(d.SeasonalComponent, 2),
+                "resid": round(d.ResidualComponent, 2),
             }
-            for moc, h in bang.iterrows()
+            for d in dong
         ],
         "thong_ke": {
             "thay_doi_trend_phan_tram": None
@@ -406,8 +439,7 @@ def tinh_phan_ra(db: Session, kieu: str) -> dict:
             else int((bang["resid"].abs() > nguong).sum()),
         },
     }
-    _nho_dem[kieu] = (bay_gio, ket_qua)
-    return ket_qua
+
 
 THU_TU_MUC = ["very low", "low", "moderate", "high", "very high"]
 TEN_MUC = {

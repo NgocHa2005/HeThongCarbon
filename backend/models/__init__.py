@@ -7,6 +7,8 @@ from models.fact_ml_prediction import FactMlPrediction
 from models.sys_carbon_alert import SysCarbonAlert
 from models.sys_clustering_run import SysClusteringRun
 from models.sys_ingestion_run import SysIngestionRun
+from models.agg_decomposition_resample import AggDecompositionResample
+
 
 # Keep the previous model names available while services migrate to the
 # canonical schema model names.
@@ -29,4 +31,5 @@ __all__ = [
     "SysCarbonAlert",
     "SysClusteringRun",
     "SysIngestionRun",
+    "AggDecompositionResample",
 ]

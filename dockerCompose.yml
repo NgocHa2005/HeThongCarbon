@@ -11,6 +11,14 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
 
+  analysis:
+    build: ./backend
+    command: python -m workers.analysis
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env to your Supabase PostgreSQL URI}
+    depends_on:
+      - backend
+
   frontend:
     build: ./frontend
     environment:

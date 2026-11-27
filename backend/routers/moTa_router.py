@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 
 from config.database import lay_phien_db
 from services.phanTich_service import (
+    _doc_chuoi_thuc_te,
+    phan_ra,
     bien_dong,
     dashboard,
-    tinh_phan_ra,
+    doc_phan_ra,
     phan_bo,
     tan_suat,
     thang_muc
@@ -47,11 +49,19 @@ def lay_phan_ra(
     kieu: str = Query("thang", pattern="^(thang|tuan)$"),
     db: Session = Depends(lay_phien_db),
 ):
-    try:
-        return tinh_phan_ra(db, kieu)
-    except ValueError as loi:
-        # thiếu dữ liệu lịch sử: trả 404 kèm lý do để giao diện hiện thông báo gọn
-        raise HTTPException(status_code=404, detail=str(loi))
+    ket_qua = doc_phan_ra(db, kieu)
+    if ket_qua is None:
+        try:
+            phan_ra(_doc_chuoi_thuc_te(db), kieu)
+            ly_do = (
+                "Bảng phân rã đang trống. "
+                "Hãy chạy worker analysis (python -m workers.analysis --once)."
+            )
+        except ValueError as loi:
+            ly_do = str(loi)
+        raise HTTPException(status_code=404, detail=ly_do)
+    return ket_qua
+
 
 @router.get("/thang-muc")
 def lay_thang_muc(db: Session = Depends(lay_phien_db)):
