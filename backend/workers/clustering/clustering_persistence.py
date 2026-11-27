@@ -192,22 +192,41 @@ def get_latest_active_run_id(session: Session) -> int | None:
     return session.scalar(stmt)
 
 
-if __name__ == "__main__":
+def run_clustering_pipeline(
+    retrain: bool = False,
+    n_clusters: int = 3,
+    is_active: bool = True,
+    deactivate_previous: bool = True,
+) -> dict[str, Any]:
+    """Chạy luồng phân cụm từ dữ liệu DB hiện tại: mặc định dùng model có sẵn (retrain=False)."""
     from workers.clustering.data_processor import (
         build_daily_clustering_features,
         load_gb_carbon_readings,
     )
-    from workers.clustering.kmeans_trainer import fit_kmeans_clusters
+    from workers.clustering.kmeans_trainer import (
+        fit_kmeans_clusters,
+        predict_kmeans_clusters,
+    )
 
     df_readings = load_gb_carbon_readings()
     df_daily = build_daily_clustering_features(df_readings)
-    df_clustered, df_centers = fit_kmeans_clusters(df_daily, n_clusters=3)
 
-    result = persist_clustering_result(
+    if retrain:
+        df_clustered, df_centers, _ = fit_kmeans_clusters(
+            df_daily, n_clusters=n_clusters
+        )
+    else:
+        df_clustered, df_centers = predict_kmeans_clusters(df_daily)
+
+    return persist_clustering_result(
         df_clustered=df_clustered,
         df_centers=df_centers,
-        n_clusters=3,
-        is_active=True,
-        deactivate_previous=True,
+        n_clusters=n_clusters,
+        is_active=is_active,
+        deactivate_previous=deactivate_previous,
     )
+
+
+if __name__ == "__main__":
+    result = run_clustering_pipeline(retrain=False, n_clusters=3)
     print("Đã lưu phân cụm vào DB thành công:", result)
